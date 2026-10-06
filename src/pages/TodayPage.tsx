@@ -78,9 +78,9 @@ export function TodayPage() {
         )}
       </PageTitle>
 
-      {todayLoad.status === 'loading' && <p className="py-8 text-center text-muted">今日の市況データを読み込んでいます…</p>}
+      {todayLoad.status === 'loading' && !t && <p className="py-8 text-center text-muted">今日の市況データを読み込んでいます…</p>}
 
-      {todayLoad.status === 'error' && (
+      {todayLoad.status === 'error' && !t && (
         <div className="panel px-5 py-4" role="alert">
           <p className="font-bold">今日の市況データを読み込めませんでした</p>
           <p className="mt-1 text-[13px] text-ink-2">{todayLoad.error.message}</p>

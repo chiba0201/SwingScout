@@ -283,7 +283,13 @@ data/today-market.json ─┐
 
 ### 市況メモから Today / 地合いを更新する
 
-ChatGPT などで作った「今日の市況」Markdown をそのまま実データに回す場合は、`raw-data/today.md` に貼り付けてから生成します。
+ChatGPT などで作った「今日の市況」Markdown は、まず **Today 画面の「市況メモ詳細」→「市況メモを貼り付け」** にそのまま貼り付けます。
+対象日とセッションを確認して **Todayに反映** を押すと、その場で Today 画面・ダッシュボード・レポートに反映されます。
+
+公開用ファイルが必要な場合は、同じ欄の **today-market.json** / **market.json** ボタンでダウンロードできます。
+静的サイトのためサーバー上の `data/` へ直接保存はできませんが、ターミナルで `today.md` を作る必要はありません。
+
+CLI で同じ処理をしたい場合だけ、次を使います。
 
 ```bash
 cp examples/real-data/today.md raw-data/today.md   # 初回だけ。以後はこのファイルを毎朝編集

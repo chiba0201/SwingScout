@@ -18,6 +18,7 @@ import type { TodayMarket } from '../types/today';
 const TOP_N = 6;
 const STORAGE_KEY = 'swingscout:prefs:v1';
 const MEMO_KEY = 'swingscout:today-memo:v1';
+const TODAY_OVERRIDE_KEY = 'swingscout:today-override:v1';
 
 interface StoredMemo {
   text: string;
@@ -36,6 +37,25 @@ function writeMemo(memo: StoredMemo | null): boolean {
   try {
     if (memo) localStorage.setItem(MEMO_KEY, JSON.stringify(memo));
     else localStorage.removeItem(MEMO_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readTodayOverride(): TodayMarket | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(TODAY_OVERRIDE_KEY) ?? 'null') as TodayMarket | null;
+    return v && typeof v.asOf === 'string' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeTodayOverride(today: TodayMarket | null): boolean {
+  try {
+    if (today) localStorage.setItem(TODAY_OVERRIDE_KEY, JSON.stringify(today));
+    else localStorage.removeItem(TODAY_OVERRIDE_KEY);
     return true;
   } catch {
     return false;
@@ -88,6 +108,9 @@ interface DataContextValue {
   analysis: DatasetAnalysis | null;
   reload: () => void;
   todayLoad: TodayLoadState;
+  todayOverride: TodayMarket | null;
+  /** ブラウザ保存の TodayMarket をセット（null で解除）。保存できなかった場合は false */
+  setTodayOverride: (today: TodayMarket | null) => boolean;
   /** Today データとスイング分析の両方が揃ったときだけ値が入る */
   todayAnalysis: TodayAnalysis | null;
   /** 画面で貼り付けた市況メモ（ブラウザ保存）の原文。無ければ '' */
@@ -110,6 +133,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [scoring, setScoring] = useState<ScoringConfig>(prefs.scoring ?? DEFAULT_SCORING_CONFIG);
   const [reloadKey, setReloadKey] = useState(0);
   const [todayLoad, setTodayLoad] = useState<TodayLoadState>({ status: 'loading' });
+  const [todayOverride, setTodayOverrideState] = useState<TodayMarket | null>(readTodayOverride);
   const [storedMemo, setStoredMemo] = useState<StoredMemo | null>(readMemo);
 
   useEffect(() => {
@@ -167,7 +191,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
   }, [load, scoring, patternId]);
 
-  const todayData = todayLoad.status === 'ready' ? todayLoad.data : null;
+  const todayData = todayOverride ?? (todayLoad.status === 'ready' ? todayLoad.data : null);
   const memo = useMemo(() => {
     if (storedMemo) return parseMarketMemo(storedMemo.text, { source: 'pasted', savedAt: storedMemo.savedAt });
     if (todayData?.memoMarkdown?.trim()) return parseMarketMemo(todayData.memoMarkdown, { source: 'json' });
@@ -183,6 +207,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const next = text.trim() ? { text, savedAt: new Date().toISOString() } : null;
     setStoredMemo(next);
     return writeMemo(next);
+  }, []);
+
+  const setTodayOverride = useCallback((today: TodayMarket | null) => {
+    setTodayOverrideState(today);
+    return writeTodayOverride(today);
   }, []);
 
   const resetScoring = useCallback(() => setScoring(DEFAULT_SCORING_CONFIG), []);
@@ -202,6 +231,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
     analysis,
     reload,
     todayLoad,
+    todayOverride,
+    setTodayOverride,
     todayAnalysis,
     pastedMemo: storedMemo?.text ?? '',
     pastedMemoSavedAt: storedMemo?.savedAt ?? null,

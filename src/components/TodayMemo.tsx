@@ -4,9 +4,12 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { formatDateTime } from '../lib/format';
+import { marketContextFromToday } from '../lib/marketContextFromToday';
 import type { ParsedMarketMemo } from '../lib/marketMemo';
 import { renderMarkdown } from '../lib/markdown';
+import { buildTodayFromMemo } from '../lib/todayBuilder';
 import { useData } from '../state/DataContext';
+import { TODAY_SCHEMA_VERSION, type TodayMarket } from '../types/today';
 
 const hostOf = (url: string) => {
   try {
@@ -15,6 +18,68 @@ const hostOf = (url: string) => {
     return url;
   }
 };
+
+function jstToday(): string {
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const y = parts.find((p) => p.type === 'year')?.value ?? '2026';
+  const m = parts.find((p) => p.type === 'month')?.value ?? '01';
+  const d = parts.find((p) => p.type === 'day')?.value ?? '01';
+  return `${y}-${m}-${d}`;
+}
+
+function downloadJson(filename: string, value: unknown) {
+  const blob = new Blob([`${JSON.stringify(value, null, 2)}\n`], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function fallbackTodayBase(): TodayMarket {
+  return {
+    meta: { schemaVersion: TODAY_SCHEMA_VERSION, generatedAt: new Date().toISOString(), source: 'ui', isSample: false },
+    asOf: jstToday(),
+    session: '寄り前',
+    stance: '様子見',
+    expectedOpen: { label: '横ばい', gapPct: 0 },
+    positionSize: { label: '通常の70〜100%' },
+    headline: '市況メモから生成してください。',
+    externalQuotes: [],
+    scenarios: [
+      {
+        id: 'large-gap-up',
+        label: '大幅GU',
+        condition: '日経先物 +0.7%以上、または候補銘柄が寄り前気配で大きく上振れ',
+        action: '寄り付きは追わず、9:15以降のVWAP押し目待ち',
+        risk: '寄り天と利食い売り',
+      },
+      {
+        id: 'flat-small-gap',
+        label: '小幅GU/横ばい',
+        condition: '日経先物 ±0.3%程度',
+        action: '上位候補の出来高とVWAP回復を確認して分割エントリー',
+        risk: '指数が伸びない場合は個別も失速',
+      },
+      {
+        id: 'gap-down',
+        label: 'GD',
+        condition: '日経先物 -0.5%以上',
+        action: '先物と半導体の下げ止まり確認まで待機',
+        risk: '前日強かった銘柄ほど利確売りが出やすい',
+      },
+    ],
+    events: [],
+    domesticNotes: [],
+    watchlistRules: { gapUpAllowedPct: 0.5, avoidIfRiskScoreOver: 65 },
+  };
+}
 
 function MemoSummary({ memo }: { memo: ParsedMarketMemo }) {
   return (
@@ -94,9 +159,12 @@ function MemoSummary({ memo }: { memo: ParsedMarketMemo }) {
 }
 
 function MemoEditor() {
-  const { pastedMemo, setPastedMemo, memo } = useData();
+  const { pastedMemo, setPastedMemo, memo, todayLoad, todayAnalysis, todayOverride, setTodayOverride } = useData();
   const [draft, setDraft] = useState(pastedMemo);
   const [status, setStatus] = useState<string | null>(null);
+  const [asOf, setAsOf] = useState(() => todayAnalysis?.today.asOf ?? jstToday());
+  const [session, setSession] = useState(() => todayAnalysis?.today.session ?? '寄り前');
+  const currentToday = todayAnalysis?.today ?? (todayLoad.status === 'ready' ? todayLoad.data : null);
 
   // 入力が止まったら保存（キー入力ごとに解析し直さない）
   useEffect(() => {
@@ -114,8 +182,71 @@ function MemoEditor() {
     return () => clearTimeout(timer);
   }, [draft, pastedMemo, setPastedMemo]);
 
+  const buildAndApply = () => {
+    if (!draft.trim()) {
+      setStatus('市況メモを貼り付けてから生成してください');
+      return;
+    }
+    const base = currentToday ?? fallbackTodayBase();
+    const today = buildTodayFromMemo(base, draft, { asOf, session, generatedAt: new Date().toISOString() });
+    const okMemo = setPastedMemo(draft);
+    const okToday = setTodayOverride(today);
+    setStatus(okMemo && okToday ? 'Todayデータをこのブラウザに反映しました' : '画面には反映しましたが、ブラウザ保存に失敗しました');
+  };
+
+  const generatedToday = draft.trim() ? buildTodayFromMemo(currentToday ?? fallbackTodayBase(), draft, { asOf, session }) : null;
+
   return (
     <div className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-[10rem_9rem_minmax(0,1fr)] sm:items-end">
+        <label className="block">
+          <span className="mb-1 block text-[11.5px] font-semibold text-ink-2">対象日</span>
+          <input className="field w-full" type="date" value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-[11.5px] font-semibold text-ink-2">セッション</span>
+          <select className="field w-full" value={session} onChange={(e) => setSession(e.target.value)}>
+            {['寄り前', '前場', '昼休み', '後場', '引け後'].map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn btn-primary" onClick={buildAndApply} disabled={!draft.trim()}>
+            Todayに反映
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={!generatedToday}
+            onClick={() => generatedToday && downloadJson('today-market.json', generatedToday)}
+          >
+            today-market.json
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={!generatedToday}
+            onClick={() => generatedToday && downloadJson('market.json', marketContextFromToday(generatedToday))}
+          >
+            market.json
+          </button>
+          {todayOverride && (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                setTodayOverride(null);
+                setStatus('ブラウザ内のToday反映を解除しました');
+              }}
+            >
+              反映を解除
+            </button>
+          )}
+        </div>
+      </div>
       <textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -140,7 +271,7 @@ function MemoEditor() {
           {status}
         </span>
         <span className="text-muted">
-          このブラウザにだけ保存されます（他の端末・閲覧者には共有されません）。
+          「Todayに反映」はこのブラウザにだけ保存されます。公開用には JSON をダウンロードして `data/` へ置いてください。
           {!pastedMemo && memo?.source === 'json' && ' 未入力の間は today-market.json のメモを表示します。'}
         </span>
       </div>

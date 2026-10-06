@@ -36,6 +36,7 @@ npm run report                             # 既定データセットから repo
 npm run report -- --detail compact --top 5 # 簡潔版・上位5銘柄
 npm run report -- --today                  # data/today-market.json の「今日の市況」を冒頭に入れる
 npm run today:check                        # data/today-market.json を検証し、監視銘柄の判定結果を表示
+npm run market:from-today                  # today-market.json の指標・市況を raw-data/market.json に同期
 ```
 
 `npm run dev` 中に `data/*.json` を更新すると、ブラウザは自動でリロードされます。
@@ -287,7 +288,7 @@ data/today-market.json ─┐
 |---|---|---|---|
 | 銘柄一覧 | `UniverseSource` | `WatchlistCsvSource` ✅ / `JpxListingCsvSource` ✅ | まずは `raw-data/watchlist.csv`、広げる場合はJPX「東証上場銘柄一覧」（xls → CSV 変換して `raw-data/jpx/listing.csv`） |
 | 日足 | `PriceSource` | `CsvPriceSource` ✅ | yfinance 相当の CSV（`raw-data/prices/<code>.csv`、列 `Date,Open,High,Low,Close,Volume`） |
-| 信用残 | `MarginSource` | `JpxMarginPdfSource` 🚧 スタブ | JPX「銘柄別信用取引週末残高」PDF（毎週火曜公表）→ pdfjs-dist 等で抽出 |
+| 信用残 | `MarginSource` | `CsvMarginSource` ✅ / `JpxMarginPdfSource` 🚧 スタブ | まずは `raw-data/margin.csv`。将来はJPX「銘柄別信用取引週末残高」PDF（毎週火曜公表）→ pdfjs-dist 等で抽出 |
 | 決算予定 | `EarningsSource` | `CsvEarningsSource` ✅ / `EdinetFundamentalsSource` 🚧 | 決算発表予定日 CSV（`raw-data/earnings.csv`）、進捗率は EDINET の XBRL 等 |
 | 材料 | `DisclosureSource` | `TdnetDisclosureSource` 🚧 | TDnet 適時開示のタイトル分類（上方修正・自社株買い → positive 等） |
 | 地合い | `MarketSource` | `JsonMarketSource` ✅ | 手書き `raw-data/market.json`（将来は指数・為替を自動取得、コメントだけ手書き） |
@@ -303,6 +304,7 @@ JPX全銘柄一覧や信用残PDFを整える前に、まず `raw-data/universe.
    mkdir -p raw-data/prices
    cp examples/real-data/universe.csv raw-data/universe.csv
    cp examples/real-data/earnings.csv raw-data/earnings.csv
+   cp examples/real-data/margin.csv raw-data/margin.csv
    cp examples/real-data/market.json raw-data/market.json
    ```
 2. `raw-data/universe.csv` を選定母集団にしたい銘柄に編集します。
@@ -316,8 +318,13 @@ JPX全銘柄一覧や信用残PDFを整える前に、まず `raw-data/universe.
      npm run prices:yahoo -- --watchlist raw-data/universe.csv --years 2
      ```
      このCLIはYahoo Financeの非公式chartエンドポイントを使います。取得に失敗する場合や規約上避けたい場合は、手動でCSVを置いてください。
-4. `raw-data/market.json` をその日の地合いに合わせて更新します。ひな形のままだと指数・為替が0のため、実運用前に必ず一次情報で埋めてください。
-5. 実データ扱いのDatasetを生成:
+4. `raw-data/margin.csv` の信用残を更新します。列は `code,asOf,buyBalance,sellBalance,buyBalancePrev,sellBalancePrev` です。空でも動きますが、需給コメントと信用倍率スコアは弱くなります。
+5. `raw-data/market.json` をその日の地合いに合わせて更新します。ひな形のままだと指数・為替が0のため、実運用前に必ず一次情報で埋めてください。
+   - `data/today-market.json` を先に実市況へ更新した日は、次でも同期できます。
+     ```bash
+     npm run market:from-today
+     ```
+6. 実データ扱いのDatasetを生成:
    ```bash
    npm run data:universe -- --as-of 2026-10-06 --label "10/6(火) 代表銘柄スクリーニング"
    ```
@@ -331,8 +338,10 @@ JPX全銘柄一覧や信用残PDFを整える前に、まず `raw-data/universe.
 ```bash
 cp examples/real-data/watchlist.csv raw-data/watchlist.csv
 npm run prices:yahoo -- --watchlist raw-data/watchlist.csv --years 2
-npm run data:watchlist -- --as-of 2026-10-06 --label "10/6(火) お気に入り監視"
+npm run data:favorites -- --as-of 2026-10-06
 ```
+
+生成先は `data/favorites.json` で、右上の通常データセット選択には混ぜません。上タブの「お気に入り」から常に確認できます。
 
 `--provider local` は上記のローカルファイル版を組み合わせた構成です（外部通信なし）。最低限 `listing.csv`・`prices/*.csv`・`market.json` を置けば動き、未実装の信用残・材料は空として続行します。
 

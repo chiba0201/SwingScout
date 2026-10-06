@@ -47,6 +47,14 @@ export async function loadDataset(file: string): Promise<Dataset> {
   return validateDataset(await fetchJson(file), file);
 }
 
+export const FAVORITES_FILE = 'favorites.json';
+
+export async function loadFavoritesDataset(): Promise<Dataset> {
+  const hint =
+    'data/favorites.json がありません。raw-data/watchlist.csv を用意して npm run data:favorites を実行してください。';
+  return validateDataset(await fetchJson(FAVORITES_FILE, hint), FAVORITES_FILE);
+}
+
 /** Today（当日の市況）は毎朝上書きする1ファイル運用 */
 export const TODAY_FILE = 'today-market.json';
 

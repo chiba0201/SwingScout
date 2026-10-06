@@ -11,6 +11,7 @@
  *   --pattern tue-fri       保有パターン（tue-fri / mon-fri / tue-thu）
  *   --keep 12 --top 6       保存件数 / 今週の候補件数
  *   --label <text>          manifest に表示する名前
+ *   --no-manifest           data/ に出力しても manifest を更新しない（favorites.json など）
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
@@ -40,6 +41,7 @@ async function main() {
       keep: { type: 'string' },
       top: { type: 'string' },
       label: { type: 'string' },
+      'no-manifest': { type: 'boolean', default: false },
     },
   });
 
@@ -65,7 +67,9 @@ async function main() {
   await writeFile(out, `${JSON.stringify(dataset, null, 2)}\n`);
   console.log(`[build-data] 書き出し: ${relative(process.cwd(), out)}`);
 
-  if (dirname(out) === resolve('data')) {
+  if (values['no-manifest']) {
+    console.log('[build-data] --no-manifest 指定のため manifest は更新しません');
+  } else if (dirname(out) === resolve('data')) {
     const label = values.label ?? (dataset.meta.isSample ? 'サンプルデータ（架空銘柄）' : `${asOf} 引け`);
     const manifest = await upsertManifest(out, dataset, label);
     console.log(`[build-data] manifest 更新（既定: ${manifest.default}）`);

@@ -5,9 +5,9 @@
 import { createMockProviders } from './mock';
 import { resolve } from 'node:path';
 import { CsvEarningsSource } from './sources/csvEarnings';
+import { CsvMarginSource } from './sources/csvMargin';
 import { CsvPriceSource } from './sources/csvPrices';
 import { JpxListingCsvSource } from './sources/jpxListing';
-import { JpxMarginPdfSource } from './sources/jpxMargin';
 import { JsonMarketSource } from './sources/jsonMarket';
 import { TdnetDisclosureSource } from './sources/tdnet';
 import { WatchlistCsvSource } from './sources/watchlistCsv';
@@ -27,7 +27,7 @@ export function createProviderSet(id: ProviderId, patternId?: string): ProviderS
         isSample: false,
         universe: new JpxListingCsvSource(),
         prices: new CsvPriceSource(),
-        margin: new JpxMarginPdfSource(),
+        margin: new CsvMarginSource(),
         earnings: new CsvEarningsSource(),
         disclosures: new TdnetDisclosureSource(),
         market: new JsonMarketSource(),
@@ -39,7 +39,7 @@ export function createProviderSet(id: ProviderId, patternId?: string): ProviderS
         isSample: false,
         universe: watchlist,
         prices: new CsvPriceSource(),
-        margin: new JpxMarginPdfSource(),
+        margin: new CsvMarginSource(),
         earnings: new CsvEarningsSource(),
         disclosures: new TdnetDisclosureSource(),
         market: new JsonMarketSource(),
@@ -54,7 +54,7 @@ export function createProviderSet(id: ProviderId, patternId?: string): ProviderS
         isSample: false,
         universe,
         prices: new CsvPriceSource(),
-        margin: new JpxMarginPdfSource(),
+        margin: new CsvMarginSource(),
         earnings: new CsvEarningsSource(),
         disclosures: new TdnetDisclosureSource(),
         market: new JsonMarketSource(),

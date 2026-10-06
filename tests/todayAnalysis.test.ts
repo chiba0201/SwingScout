@@ -6,7 +6,7 @@ import { validateDataset, validateTodayMarket } from '../src/lib/validate';
 import type { TodayMarket } from '../src/types/today';
 
 const swing = analyzeDataset(validateDataset(JSON.parse(readFileSync('data/mock-candidates.json', 'utf8'))));
-const today = validateTodayMarket(JSON.parse(readFileSync('data/today-market.json', 'utf8')));
+const today = validateTodayMarket(JSON.parse(readFileSync('tests/fixtures/today-market.sample.json', 'utf8')));
 const byCode = (code: string) => swing.top.find((c) => c.code === code)!;
 
 /** 寄り追いが許される地合い（買い目線・VI低め・小幅GU） */

@@ -5,7 +5,7 @@
 
 - フロントエンドは **静的ファイルのみ**（Vite + React + TypeScript + Tailwind CSS）。PHP や Node サーバーの常駐は不要
 - データ取得・重い計算は **ローカルの CLI** で行い、`data/*.json` を生成 → フロントが `fetch` で読む
-- 現在は **モックデータ（架空銘柄）** で動作し、外部通信・APIキーは一切使いません
+- モックデータに加えて、代表銘柄ユニバース／お気に入り銘柄を `raw-data/` のCSVから生成できます。外部通信・APIキーなしでも動きます
 
 > ⚠ 本ツールは分析補助を目的としたもので、投資助言・売買推奨ではありません。
 > 同梱のサンプルデータは銘柄・価格・需給・日程・コメントがすべて架空です。
@@ -36,6 +36,7 @@ npm run report                             # 既定データセットから repo
 npm run report -- --detail compact --top 5 # 簡潔版・上位5銘柄
 npm run report -- --today                  # data/today-market.json の「今日の市況」を冒頭に入れる
 npm run today:check                        # data/today-market.json を検証し、監視銘柄の判定結果を表示
+npm run today:from-memo                    # raw-data/today.md の市況メモから data/today-market.json を生成
 npm run market:from-today                  # today-market.json の指標・市況を raw-data/market.json に同期
 ```
 
@@ -279,6 +280,21 @@ data/today-market.json ─┐
 - 抽出できなくても**原文はそのまま**「原文を表示」で確認できます（生HTMLはエスケープ、画像は読み込まない、リンクは http(s) のみ）
 - 貼り付けメモは**そのブラウザだけ**に保存されます。他の端末やさくらの閲覧者にも見せたい場合は `today-market.json` の `memoMarkdown` に入れてください
 - レポートの「今日の市況」には、抽出した要点（要確認・見出し要約・表・参照元）が入り、見出しも表も無いメモは原文冒頭を要約として載せます
+
+### 市況メモから Today / 地合いを更新する
+
+ChatGPT などで作った「今日の市況」Markdown をそのまま実データに回す場合は、`raw-data/today.md` に貼り付けてから生成します。
+
+```bash
+cp examples/real-data/today.md raw-data/today.md   # 初回だけ。以後はこのファイルを毎朝編集
+npm run today:from-memo -- --as-of 2026-10-06
+npm run today:check
+npm run market:from-today
+```
+
+- `today:from-memo` は、見出し・表・本文から NYダウ / NASDAQ / S&P500 / SOX / VIX / 日経先物 / ドル円 / 米10年債、結論、イベント、国内材料を抽出して `data/today-market.json` を作ります。
+- 抽出できない指標や `未確認` / `要確認` などの文言は Today 画面の「市況メモ詳細」に残るので、寄り前に一次情報で確認してください。
+- `market:from-today` は Today の外部指標と市況コメントを `raw-data/market.json` に同期します。そのあと `data:universe` / `data:favorites` を実行すると、スイング側の地合いカードも同じ内容になります。
 
 ## データ取得の拡張ポイント
 

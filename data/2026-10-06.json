@@ -1,43 +1,61 @@
 {
   "meta": {
     "schemaVersion": 1,
-    "generatedAt": "2026-10-06T10:15:17.869Z",
+    "generatedAt": "2026-10-06T10:43:37.281Z",
     "source": "universe",
     "isSample": false
   },
   "asOf": "2026-10-06",
   "marketContext": {
     "stance": "neutral",
-    "headline": "実データ運用のひな形です。market.json は毎日または毎週、一次情報を確認して更新してください。",
-    "summaryToday": "指数・為替・VIは手入力のひな形です。Today の市況メモと合わせて確認してください。",
-    "summaryWeek": "週次のイベントと地合いを手入力で更新してください。",
+    "headline": "SOX高は追い風。ただし日経VI高めで寄り追い禁止。9:15以降の押し目待ち。",
+    "summaryToday": "日経先物 +0.39% をもとに推定",
+    "summaryWeek": "半導体関連はSOX高を受けて買い先行になりやすい。決算予定銘柄は引け前のポジション調整に注意",
     "indices": [
       {
-        "id": "nikkei225",
-        "label": "日経平均",
-        "value": 0,
+        "id": "dow",
+        "label": "NYダウ",
+        "value": 46800,
         "change": 0,
-        "changePct": 0,
-        "decimals": 0,
+        "changePct": 0.26,
+        "decimals": 1,
         "polarity": "up-good"
       },
       {
-        "id": "topix",
-        "label": "TOPIX",
-        "value": 0,
+        "id": "nasdaq",
+        "label": "NASDAQ",
+        "value": 23410.8,
         "change": 0,
-        "changePct": 0,
+        "changePct": 0.65,
+        "decimals": 1,
+        "polarity": "up-good"
+      },
+      {
+        "id": "sp500",
+        "label": "S&P500",
+        "value": 6890.2,
+        "change": 0,
+        "changePct": 0.41,
+        "decimals": 1,
+        "polarity": "up-good"
+      },
+      {
+        "id": "sox",
+        "label": "SOX指数",
+        "value": 6420.5,
+        "change": 0,
+        "changePct": 1.85,
         "decimals": 1,
         "polarity": "up-good"
       }
     ],
     "volatility": [
       {
-        "id": "nikkeiVI",
-        "label": "日経VI",
-        "value": 18,
+        "id": "vix",
+        "label": "VIX",
+        "value": 17.2,
         "change": 0,
-        "changePct": 0,
+        "changePct": -2.27,
         "decimals": 2,
         "polarity": "up-bad"
       }
@@ -46,10 +64,9 @@
       {
         "id": "usdjpy",
         "label": "ドル円",
-        "value": 0,
+        "value": 149.82,
         "change": 0,
-        "changePct": 0,
-        "weekChangePct": 0,
+        "changePct": 0.3,
         "decimals": 2,
         "unit": "円",
         "polarity": "neutral"
@@ -59,18 +76,42 @@
       {
         "id": "us10y",
         "label": "米10年債",
-        "value": 0,
+        "value": 4.12,
         "change": 0,
-        "changePct": 0,
+        "changePct": 0.73,
         "decimals": 2,
         "unit": "%",
         "polarity": "neutral"
       }
     ],
-    "events": [],
+    "events": [
+      {
+        "date": "2026-10-06",
+        "label": "決算予定銘柄は引け前のポジション調整に注意",
+        "category": "earnings",
+        "importance": "medium",
+        "note": "市況メモから抽出"
+      },
+      {
+        "date": "2026-10-06",
+        "time": "23:00",
+        "label": "23:00 米JOLTS求人件数",
+        "category": "us-macro",
+        "importance": "medium",
+        "note": "市況メモから抽出"
+      },
+      {
+        "date": "2026-10-06",
+        "label": "SQに注意",
+        "category": "sq",
+        "importance": "high",
+        "note": "市況メモから抽出"
+      }
+    ],
     "sectors": [],
     "riskNotes": [
-      "実データに切り替えた直後は、価格・決算・信用残・イベントを一次情報で確認してください。"
+      "VIXは落ち着いた水準",
+      "決算予定銘柄は引け前のポジション調整に注意"
     ]
   },
   "candidates": [
@@ -220,11 +261,11 @@
         ]
       },
       "scores": {
-        "total": 62.3,
+        "total": 62.7,
         "supplyDemand": 59.9,
         "technical": 87.3,
-        "event": 50,
-        "risk": 13.9
+        "event": 50.5,
+        "risk": 13.3
       }
     },
     {
@@ -374,11 +415,11 @@
         ]
       },
       "scores": {
-        "total": 60.3,
+        "total": 60.5,
         "supplyDemand": 50.4,
         "technical": 85.7,
-        "event": 50,
-        "risk": 7.8
+        "event": 50.5,
+        "risk": 7.5
       }
     },
     {
@@ -527,11 +568,11 @@
         ]
       },
       "scores": {
-        "total": 59.7,
+        "total": 59.9,
         "supplyDemand": 50.4,
         "technical": 90.7,
-        "event": 50,
-        "risk": 15.8
+        "event": 50.5,
+        "risk": 15.5
       }
     },
     {
@@ -681,11 +722,11 @@
         ]
       },
       "scores": {
-        "total": 58.8,
+        "total": 59,
         "supplyDemand": 54.1,
         "technical": 87.1,
-        "event": 50,
-        "risk": 18.7
+        "event": 50.3,
+        "risk": 18.3
       }
     },
     {
@@ -834,11 +875,11 @@
         ]
       },
       "scores": {
-        "total": 54.2,
+        "total": 54.3,
         "supplyDemand": 51.9,
         "technical": 86.2,
-        "event": 50,
-        "risk": 30.4
+        "event": 50.3,
+        "risk": 30.3
       }
     },
     {
@@ -988,11 +1029,11 @@
         ]
       },
       "scores": {
-        "total": 53.5,
+        "total": 53.8,
         "supplyDemand": 48.4,
         "technical": 80.6,
-        "event": 50,
-        "risk": 22
+        "event": 50.5,
+        "risk": 21.4
       }
     },
     {
@@ -1142,11 +1183,11 @@
         ]
       },
       "scores": {
-        "total": 52.4,
+        "total": 52.6,
         "supplyDemand": 63.8,
         "technical": 69.2,
-        "event": 50,
-        "risk": 30.4
+        "event": 50.3,
+        "risk": 30.2
       }
     },
     {
@@ -1296,169 +1337,15 @@
         ]
       },
       "scores": {
-        "total": 51.9,
+        "total": 52.4,
         "supplyDemand": 51.6,
         "technical": 66.2,
-        "event": 50,
-        "risk": 14.5
+        "event": 51.3,
+        "risk": 13.9
       }
     },
     {
       "rank": 9,
-      "code": "6762",
-      "name": "TDK",
-      "market": "プライム",
-      "sector": "電気機器",
-      "theme": "電子部品・電池",
-      "price": {
-        "close": 3628,
-        "prevClose": 3447,
-        "change": 181,
-        "changePct": 5.25,
-        "open": 3505,
-        "high": 3698,
-        "low": 3441,
-        "high20d": 3499,
-        "low20d": 2724,
-        "history": [
-          3298,
-          3382,
-          3389,
-          3203,
-          3234,
-          3246,
-          3085,
-          2968,
-          3073,
-          3107,
-          3116,
-          3021,
-          3012,
-          2927.5,
-          2746,
-          2811.5,
-          3008,
-          3092,
-          3052,
-          3150,
-          3013,
-          2988,
-          3045,
-          3114,
-          3235,
-          3210,
-          3244,
-          3139,
-          3006,
-          3011,
-          3041,
-          3042,
-          3049,
-          3031,
-          3077,
-          3112,
-          3078,
-          3079,
-          2884,
-          2832.5,
-          2907.5,
-          2980.5,
-          2775,
-          2812.5,
-          2850.5,
-          2808.5,
-          2816.5,
-          2833.5,
-          2872,
-          2806,
-          2845,
-          2954.5,
-          2978,
-          2955,
-          2919,
-          2981,
-          3200,
-          3198,
-          3447,
-          3628
-        ]
-      },
-      "volume": {
-        "latest": 32379800,
-        "avg5d": 19338840,
-        "avg20d": 11915860,
-        "turnoverOku": 1174.7
-      },
-      "technical": {
-        "ma5": 3290.8,
-        "ma25": 2982.1,
-        "ma75": 3182.6,
-        "rsi14": 76.2,
-        "atr14": 142.5,
-        "pattern": "急騰後の押し待ち"
-      },
-      "margin": {
-        "asOf": "2026-10-02",
-        "buyBalance": 125000,
-        "sellBalance": 110000,
-        "buyBalancePrev": 116000,
-        "sellBalancePrev": 58000
-      },
-      "earnings": {
-        "nextDate": null,
-        "timing": "unknown"
-      },
-      "sensitivity": {
-        "usdJpy": 0.4,
-        "beta": 1.2
-      },
-      "comments": {
-        "supplyDemand": "出来高は20日平均の2.7倍（5日平均でも1.6倍）と商いを伴う。信用倍率1.1倍。買残は前週比+8%とやや増加。売残は+90%と増え、踏み上げ余地あり。売買代金1,175億円。",
-        "technical": "5日線（3,291）＞25日線（2,982）の上昇配列で、終値は両線の上。直近20日高値（3,499）を終値で上抜け。25日線乖離+21.7%とやや過熱。RSI 76。ATR 143円（3.9%）。",
-        "fundamental": "電子部品と電池材料のテーマに反応しやすい。次回決算日は未発表。"
-      },
-      "entryPlan": {
-        "method": "初日は寄りで追わない。利食い一巡後の押し（3,485〜3,590円）を待ち、届かなければ見送り。",
-        "zoneLow": 3485,
-        "zoneHigh": 3590,
-        "gapUpRule": "前日終値比+3%（3,735円）超のGUは寄りで追わず、5分足でVWAPを回復してからの押しを待つ。+6%超は見送り。"
-      },
-      "stopLoss": {
-        "price": 3410,
-        "rule": "ATR×1.5（213.8円）下で機械的に撤退"
-      },
-      "takeProfit": {
-        "targets": [
-          {
-            "price": 3845,
-            "label": "半分利確"
-          },
-          {
-            "price": 4060,
-            "label": "残り利確"
-          }
-        ],
-        "rule": "届かなければ残りは5日線割れでトレール。10/16(金)大引けまでに全決済（持ち越さない）。"
-      },
-      "risks": {
-        "flags": [],
-        "skipConditions": [
-          "値動きが荒い日は押し目限定",
-          "寄りで前日終値比+6%超のGU",
-          "前日高値を超えられず、前場で陰線になった場合",
-          "寄り前の日経先物が−1.5%超の下落"
-        ]
-      },
-      "scores": {
-        "total": 51.1,
-        "supplyDemand": 79.8,
-        "technical": 77.3,
-        "event": 50,
-        "risk": 63
-      }
-    },
-    {
-      "rank": 10,
       "code": "6857",
       "name": "アドバンテスト",
       "market": "プライム",
@@ -1604,11 +1491,165 @@
         ]
       },
       "scores": {
-        "total": 51.1,
+        "total": 51.3,
         "supplyDemand": 77.2,
         "technical": 78.7,
-        "event": 50,
-        "risk": 61.5
+        "event": 51,
+        "risk": 62
+      }
+    },
+    {
+      "rank": 10,
+      "code": "6762",
+      "name": "TDK",
+      "market": "プライム",
+      "sector": "電気機器",
+      "theme": "電子部品・電池",
+      "price": {
+        "close": 3628,
+        "prevClose": 3447,
+        "change": 181,
+        "changePct": 5.25,
+        "open": 3505,
+        "high": 3698,
+        "low": 3441,
+        "high20d": 3499,
+        "low20d": 2724,
+        "history": [
+          3298,
+          3382,
+          3389,
+          3203,
+          3234,
+          3246,
+          3085,
+          2968,
+          3073,
+          3107,
+          3116,
+          3021,
+          3012,
+          2927.5,
+          2746,
+          2811.5,
+          3008,
+          3092,
+          3052,
+          3150,
+          3013,
+          2988,
+          3045,
+          3114,
+          3235,
+          3210,
+          3244,
+          3139,
+          3006,
+          3011,
+          3041,
+          3042,
+          3049,
+          3031,
+          3077,
+          3112,
+          3078,
+          3079,
+          2884,
+          2832.5,
+          2907.5,
+          2980.5,
+          2775,
+          2812.5,
+          2850.5,
+          2808.5,
+          2816.5,
+          2833.5,
+          2872,
+          2806,
+          2845,
+          2954.5,
+          2978,
+          2955,
+          2919,
+          2981,
+          3200,
+          3198,
+          3447,
+          3628
+        ]
+      },
+      "volume": {
+        "latest": 32379800,
+        "avg5d": 19338840,
+        "avg20d": 11915860,
+        "turnoverOku": 1174.7
+      },
+      "technical": {
+        "ma5": 3290.8,
+        "ma25": 2982.1,
+        "ma75": 3182.6,
+        "rsi14": 76.2,
+        "atr14": 142.5,
+        "pattern": "急騰後の押し待ち"
+      },
+      "margin": {
+        "asOf": "2026-10-02",
+        "buyBalance": 125000,
+        "sellBalance": 110000,
+        "buyBalancePrev": 116000,
+        "sellBalancePrev": 58000
+      },
+      "earnings": {
+        "nextDate": null,
+        "timing": "unknown"
+      },
+      "sensitivity": {
+        "usdJpy": 0.4,
+        "beta": 1.2
+      },
+      "comments": {
+        "supplyDemand": "出来高は20日平均の2.7倍（5日平均でも1.6倍）と商いを伴う。信用倍率1.1倍。買残は前週比+8%とやや増加。売残は+90%と増え、踏み上げ余地あり。売買代金1,175億円。",
+        "technical": "5日線（3,291）＞25日線（2,982）の上昇配列で、終値は両線の上。直近20日高値（3,499）を終値で上抜け。25日線乖離+21.7%とやや過熱。RSI 76。ATR 143円（3.9%）。",
+        "fundamental": "電子部品と電池材料のテーマに反応しやすい。次回決算日は未発表。"
+      },
+      "entryPlan": {
+        "method": "初日は寄りで追わない。利食い一巡後の押し（3,485〜3,590円）を待ち、届かなければ見送り。",
+        "zoneLow": 3485,
+        "zoneHigh": 3590,
+        "gapUpRule": "前日終値比+3%（3,735円）超のGUは寄りで追わず、5分足でVWAPを回復してからの押しを待つ。+6%超は見送り。"
+      },
+      "stopLoss": {
+        "price": 3410,
+        "rule": "ATR×1.5（213.8円）下で機械的に撤退"
+      },
+      "takeProfit": {
+        "targets": [
+          {
+            "price": 3845,
+            "label": "半分利確"
+          },
+          {
+            "price": 4060,
+            "label": "残り利確"
+          }
+        ],
+        "rule": "届かなければ残りは5日線割れでトレール。10/16(金)大引けまでに全決済（持ち越さない）。"
+      },
+      "risks": {
+        "flags": [],
+        "skipConditions": [
+          "値動きが荒い日は押し目限定",
+          "寄りで前日終値比+6%超のGU",
+          "前日高値を超えられず、前場で陰線になった場合",
+          "寄り前の日経先物が−1.5%超の下落"
+        ]
+      },
+      "scores": {
+        "total": 51.2,
+        "supplyDemand": 79.8,
+        "technical": 77.3,
+        "event": 51,
+        "risk": 63.8
       }
     },
     {
@@ -1758,11 +1799,11 @@
         ]
       },
       "scores": {
-        "total": 49,
+        "total": 49.1,
         "supplyDemand": 66.7,
         "technical": 81.6,
-        "event": 50,
-        "risk": 59.7
+        "event": 50.8,
+        "risk": 60.1
       }
     },
     {
@@ -1911,11 +1952,11 @@
         ]
       },
       "scores": {
-        "total": 48.5,
+        "total": 49,
         "supplyDemand": 59.3,
         "technical": 45.7,
-        "event": 50,
-        "risk": 10.8
+        "event": 49.5,
+        "risk": 8.7
       }
     }
   ]

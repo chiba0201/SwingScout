@@ -1,0 +1,150 @@
+{
+  "meta": {
+    "schemaVersion": 1,
+    "generatedAt": "2026-10-06T08:15:00+09:00",
+    "source": "mock",
+    "isSample": true,
+    "notes": [
+      "サンプルデータ：指標・ニュース・市況メモはすべて架空です。"
+    ]
+  },
+  "asOf": "2026-10-06",
+  "session": "寄り前",
+  "stance": "押し目待ち",
+  "expectedOpen": {
+    "label": "ややGU",
+    "gapPct": 0.4,
+    "note": "SOX高と円安は追い風だが、日経VI高めで寄り天に注意"
+  },
+  "positionSize": {
+    "label": "通常の70%",
+    "reason": "日経VIが高めで、寄り追いより押し目待ちが優先"
+  },
+  "headline": "SOX高は追い風。ただし日経VI高めで寄り追い禁止。9:15以降の押し目待ち。",
+  "externalQuotes": [
+    {
+      "id": "dow",
+      "label": "NYダウ",
+      "value": 46800,
+      "change": 120,
+      "changePct": 0.26,
+      "decimals": 0,
+      "polarity": "up-good"
+    },
+    {
+      "id": "nasdaq",
+      "label": "NASDAQ",
+      "value": 23410.8,
+      "change": 151.3,
+      "changePct": 0.65,
+      "decimals": 1,
+      "polarity": "up-good"
+    },
+    {
+      "id": "sp500",
+      "label": "S&P500",
+      "value": 6890.2,
+      "change": 28.1,
+      "changePct": 0.41,
+      "decimals": 1,
+      "polarity": "up-good"
+    },
+    {
+      "id": "sox",
+      "label": "SOX指数",
+      "value": 6420.5,
+      "change": 116.6,
+      "changePct": 1.85,
+      "decimals": 1,
+      "polarity": "up-good"
+    },
+    {
+      "id": "vix",
+      "label": "VIX",
+      "value": 17.2,
+      "change": -0.4,
+      "changePct": -2.27,
+      "decimals": 2,
+      "polarity": "up-bad"
+    },
+    {
+      "id": "nikkeiFuture",
+      "label": "日経先物",
+      "value": 48520,
+      "change": 190,
+      "changePct": 0.39,
+      "decimals": 0,
+      "polarity": "up-good"
+    },
+    {
+      "id": "usdjpy",
+      "label": "ドル円",
+      "value": 149.82,
+      "change": 0.45,
+      "changePct": 0.3,
+      "decimals": 2,
+      "unit": "円",
+      "polarity": "neutral"
+    },
+    {
+      "id": "us10y",
+      "label": "米10年債",
+      "value": 4.12,
+      "change": 0.03,
+      "changePct": 0.73,
+      "decimals": 2,
+      "unit": "%",
+      "polarity": "neutral"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "large-gap-up",
+      "label": "大幅GU",
+      "condition": "日経先物 +0.7%以上、または候補銘柄が寄り前気配で大きく上振れ",
+      "action": "寄り付きは追わず、9:15以降のVWAP押し目待ち",
+      "risk": "寄り天と利食い売り"
+    },
+    {
+      "id": "flat-small-gap",
+      "label": "小幅GU/横ばい",
+      "condition": "日経先物 ±0.3%程度",
+      "action": "上位候補の出来高とVWAP回復を確認して分割エントリー",
+      "risk": "指数が伸びない場合は個別も失速"
+    },
+    {
+      "id": "gap-down",
+      "label": "GD",
+      "condition": "日経先物 -0.5%以上",
+      "action": "先物と半導体の下げ止まり確認まで待機",
+      "risk": "前日強かった銘柄ほど利確売りが出やすい"
+    }
+  ],
+  "events": [
+    {
+      "time": "08:30",
+      "label": "毎月勤労統計",
+      "importance": "low",
+      "category": "jp-macro",
+      "note": "影響は限定的。寄り前の先物の反応だけ確認"
+    },
+    {
+      "time": "23:00",
+      "label": "米JOLTS求人件数",
+      "importance": "medium",
+      "category": "us-macro",
+      "note": "翌朝のGU/GD要因"
+    }
+  ],
+  "domesticNotes": [
+    "半導体関連はSOX高を受けて買い先行になりやすい",
+    "決算予定銘柄は引け前のポジション調整に注意",
+    "指数が高寄りした場合は、寄り付き直後の出来高ピーク後の押しを待つ",
+    "明朝（日本時間）に米FOMC議事録。今日の大引けは持ち高を軽めに"
+  ],
+  "watchlistRules": {
+    "gapUpAllowedPct": 0.5,
+    "avoidIfRiskScoreOver": 65
+  },
+  "memoMarkdown": "# 10/6(火) 寄り前の市況メモ\n\n**結論：SOX高と円安は追い風。ただし日経VIが高めなので、寄り追いはせず9:15以降の押し目待ち。**\n\n### 海外市場\n- NYダウ +0.26%、NASDAQ +0.65%、SOX +1.85%と半導体主導の上昇\n- VIXは17.2と低下し、リスク選好は維持\n\n| 指標 | 終値 | 前日比 |\n|---|---:|---:|\n| NYダウ | 46,800 | +0.26% |\n| SOX指数 | 6,420.5 | +1.85% |\n| 日経先物（夜間） | 48,520 | +0.39% |\n\n### 為替・金利\n- ドル円は149円台後半。輸出株には追い風\n- 米10年債利回りは4.12%とやや上昇。グロース株の上値は重くなりやすい\n\n### 国内材料\n- 半導体製造装置の受注回復を伝える報道（サンプル）。[出典の例](https://example.com/news/semiconductor)\n- 主要小売の月次売上は前年比プラスとの見方（※速報値は未確認）\n\n### 注意点\n- 日経VIは前日終値で22台。寄り天に注意\n- 一部銘柄の決算日程は取得できていないため、各社IRで確認が必要\n- 参考: [経済指標カレンダーの例](https://example.com/calendar)\n"
+}

@@ -8,7 +8,7 @@ import { generateTodayReport, renderTodaySection } from '../src/lib/todayReportG
 import { validateDataset, validateTodayMarket } from '../src/lib/validate';
 
 const swing = analyzeDataset(validateDataset(JSON.parse(readFileSync('data/mock-candidates.json', 'utf8'))));
-const today = validateTodayMarket(JSON.parse(readFileSync('data/today-market.json', 'utf8')));
+const today = validateTodayMarket(JSON.parse(readFileSync('tests/fixtures/today-market.sample.json', 'utf8')));
 const memo = parseMarketMemo(today.memoMarkdown!, { source: 'json' });
 const t = analyzeToday(today, swing, memo);
 

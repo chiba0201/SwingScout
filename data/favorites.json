@@ -1,43 +1,61 @@
 {
   "meta": {
     "schemaVersion": 1,
-    "generatedAt": "2026-10-06T10:15:18.135Z",
+    "generatedAt": "2026-10-06T10:43:37.263Z",
     "source": "watchlist",
     "isSample": false
   },
   "asOf": "2026-10-06",
   "marketContext": {
     "stance": "neutral",
-    "headline": "実データ運用のひな形です。market.json は毎日または毎週、一次情報を確認して更新してください。",
-    "summaryToday": "指数・為替・VIは手入力のひな形です。Today の市況メモと合わせて確認してください。",
-    "summaryWeek": "週次のイベントと地合いを手入力で更新してください。",
+    "headline": "SOX高は追い風。ただし日経VI高めで寄り追い禁止。9:15以降の押し目待ち。",
+    "summaryToday": "日経先物 +0.39% をもとに推定",
+    "summaryWeek": "半導体関連はSOX高を受けて買い先行になりやすい。決算予定銘柄は引け前のポジション調整に注意",
     "indices": [
       {
-        "id": "nikkei225",
-        "label": "日経平均",
-        "value": 0,
+        "id": "dow",
+        "label": "NYダウ",
+        "value": 46800,
         "change": 0,
-        "changePct": 0,
-        "decimals": 0,
+        "changePct": 0.26,
+        "decimals": 1,
         "polarity": "up-good"
       },
       {
-        "id": "topix",
-        "label": "TOPIX",
-        "value": 0,
+        "id": "nasdaq",
+        "label": "NASDAQ",
+        "value": 23410.8,
         "change": 0,
-        "changePct": 0,
+        "changePct": 0.65,
+        "decimals": 1,
+        "polarity": "up-good"
+      },
+      {
+        "id": "sp500",
+        "label": "S&P500",
+        "value": 6890.2,
+        "change": 0,
+        "changePct": 0.41,
+        "decimals": 1,
+        "polarity": "up-good"
+      },
+      {
+        "id": "sox",
+        "label": "SOX指数",
+        "value": 6420.5,
+        "change": 0,
+        "changePct": 1.85,
         "decimals": 1,
         "polarity": "up-good"
       }
     ],
     "volatility": [
       {
-        "id": "nikkeiVI",
-        "label": "日経VI",
-        "value": 18,
+        "id": "vix",
+        "label": "VIX",
+        "value": 17.2,
         "change": 0,
-        "changePct": 0,
+        "changePct": -2.27,
         "decimals": 2,
         "polarity": "up-bad"
       }
@@ -46,10 +64,9 @@
       {
         "id": "usdjpy",
         "label": "ドル円",
-        "value": 0,
+        "value": 149.82,
         "change": 0,
-        "changePct": 0,
-        "weekChangePct": 0,
+        "changePct": 0.3,
         "decimals": 2,
         "unit": "円",
         "polarity": "neutral"
@@ -59,18 +76,42 @@
       {
         "id": "us10y",
         "label": "米10年債",
-        "value": 0,
+        "value": 4.12,
         "change": 0,
-        "changePct": 0,
+        "changePct": 0.73,
         "decimals": 2,
         "unit": "%",
         "polarity": "neutral"
       }
     ],
-    "events": [],
+    "events": [
+      {
+        "date": "2026-10-06",
+        "label": "決算予定銘柄は引け前のポジション調整に注意",
+        "category": "earnings",
+        "importance": "medium",
+        "note": "市況メモから抽出"
+      },
+      {
+        "date": "2026-10-06",
+        "time": "23:00",
+        "label": "23:00 米JOLTS求人件数",
+        "category": "us-macro",
+        "importance": "medium",
+        "note": "市況メモから抽出"
+      },
+      {
+        "date": "2026-10-06",
+        "label": "SQに注意",
+        "category": "sq",
+        "importance": "high",
+        "note": "市況メモから抽出"
+      }
+    ],
     "sectors": [],
     "riskNotes": [
-      "実データに切り替えた直後は、価格・決算・信用残・イベントを一次情報で確認してください。"
+      "VIXは落ち着いた水準",
+      "決算予定銘柄は引け前のポジション調整に注意"
     ]
   },
   "candidates": [
@@ -221,11 +262,11 @@
         ]
       },
       "scores": {
-        "total": 57.1,
+        "total": 57.3,
         "supplyDemand": 63.8,
         "technical": 69.2,
-        "event": 50,
-        "risk": 14.9
+        "event": 50.3,
+        "risk": 14.4
       }
     },
     {
@@ -375,11 +416,11 @@
         ]
       },
       "scores": {
-        "total": 52.8,
+        "total": 53.1,
         "supplyDemand": 77.2,
         "technical": 78.7,
-        "event": 50,
-        "risk": 56
+        "event": 51,
+        "risk": 55.9
       }
     },
     {
@@ -528,10 +569,10 @@
         ]
       },
       "scores": {
-        "total": 49.9,
+        "total": 50.1,
         "supplyDemand": 62.3,
         "technical": 80.3,
-        "event": 50,
+        "event": 50.8,
         "risk": 50.2
       }
     }

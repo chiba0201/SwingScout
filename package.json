@@ -19,7 +19,8 @@
     "prices:yahoo": "tsx scripts/fetch-yahoo-prices.ts",
     "market:from-today": "tsx scripts/sync-market-from-today.ts",
     "report": "tsx scripts/generate-report.ts",
-    "today:check": "tsx scripts/check-today.ts"
+    "today:check": "tsx scripts/check-today.ts",
+    "today:from-memo": "tsx scripts/build-today-from-memo.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

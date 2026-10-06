@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { PageTitle, Panel } from '../components/ui';
 import { buildDatasetInBrowser, type BrowserDatasetResult } from '../lib/browserDatasetBuilder';
@@ -6,6 +6,18 @@ import { formatDateJa } from '../lib/calendar';
 import { marketContextFromToday } from '../lib/marketContextFromToday';
 import { useData } from '../state/DataContext';
 import type { MarketContext } from '../types/dataset';
+
+const WORK_KEY = 'swingscout:data-update-work:v1';
+
+interface WorkSet {
+  mode: 'universe' | 'favorites';
+  asOf: string;
+  universeCsv: string;
+  marginCsv: string;
+  earningsCsv: string;
+  marketJson: string;
+  prices: [string, string][];
+}
 
 const defaultUniverse = `code,name,market,sector,theme,usdJpy,beta,fundamentalNote,flags,skipConditions,pattern
 6857,アドバンテスト,プライム,電気機器,半導体,0.4,1.6,AI向け半導体テスタ需要に連動しやすい,,決算日程を確認する,高値ブレイク
@@ -39,6 +51,30 @@ function downloadJson(filename: string, value: unknown) {
   URL.revokeObjectURL(url);
 }
 
+function readWorkSet(): Partial<WorkSet> | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(WORK_KEY) ?? 'null') as Partial<WorkSet> | null;
+    return v && typeof v === 'object' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeWorkSet(work: WorkSet) {
+  try {
+    localStorage.setItem(WORK_KEY, JSON.stringify(work));
+  } catch {
+    /* 容量超過など。作業自体は継続する */
+  }
+}
+
+async function readWorkSetFile(file: File | null): Promise<WorkSet | null> {
+  if (!file) return null;
+  const json = JSON.parse(await file.text()) as WorkSet;
+  if (!json || !Array.isArray(json.prices) || typeof json.universeCsv !== 'string') throw new Error('作業セットJSONの形式が正しくありません。');
+  return json;
+}
+
 async function readPriceFiles(files: FileList | null): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   if (!files) return out;
@@ -59,17 +95,19 @@ function statText(result: BrowserDatasetResult | null) {
 export function DataUpdatePage() {
   const { todayAnalysis, analysis, patternId, datasetOverride, favoritesOverride, setDatasetOverride, setFavoritesOverride } = useData();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<'universe' | 'favorites'>('universe');
-  const [asOf, setAsOf] = useState(analysis?.dataset.asOf ?? jstToday());
-  const [universeCsv, setUniverseCsv] = useState(defaultUniverse);
-  const [marginCsv, setMarginCsv] = useState(defaultMargin);
-  const [earningsCsv, setEarningsCsv] = useState(defaultEarnings);
+  const saved = useMemo(readWorkSet, []);
+  const [mode, setMode] = useState<'universe' | 'favorites'>(saved?.mode ?? 'universe');
+  const [asOf, setAsOf] = useState(saved?.asOf ?? analysis?.dataset.asOf ?? jstToday());
+  const [universeCsv, setUniverseCsv] = useState(saved?.universeCsv ?? defaultUniverse);
+  const [marginCsv, setMarginCsv] = useState(saved?.marginCsv ?? defaultMargin);
+  const [earningsCsv, setEarningsCsv] = useState(saved?.earningsCsv ?? defaultEarnings);
   const [marketJson, setMarketJson] = useState(() =>
-    JSON.stringify(todayAnalysis ? marketContextFromToday(todayAnalysis.today) : (analysis?.dataset.marketContext ?? null), null, 2),
+    saved?.marketJson ?? JSON.stringify(todayAnalysis ? marketContextFromToday(todayAnalysis.today) : (analysis?.dataset.marketContext ?? null), null, 2),
   );
-  const [pricesByCode, setPricesByCode] = useState<Map<string, string>>(new Map());
+  const [pricesByCode, setPricesByCode] = useState<Map<string, string>>(new Map(saved?.prices ?? []));
   const [result, setResult] = useState<BrowserDatasetResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [workStatus, setWorkStatus] = useState<string | null>(saved ? '前回の作業セットを復元しました' : null);
 
   const outputFile = mode === 'favorites' ? 'favorites.json' : `${asOf}.json`;
   const market: MarketContext | null = useMemo(() => {
@@ -79,6 +117,16 @@ export function DataUpdatePage() {
       return null;
     }
   }, [marketJson]);
+
+  const workSet: WorkSet = useMemo(
+    () => ({ mode, asOf, universeCsv, marginCsv, earningsCsv, marketJson, prices: [...pricesByCode.entries()] }),
+    [asOf, earningsCsv, marginCsv, marketJson, mode, pricesByCode, universeCsv],
+  );
+
+  useEffect(() => {
+    const timer = setTimeout(() => writeWorkSet(workSet), 500);
+    return () => clearTimeout(timer);
+  }, [workSet]);
 
   const generate = () => {
     setError(null);
@@ -117,6 +165,19 @@ export function DataUpdatePage() {
       setDatasetOverride(result.dataset);
       navigate('/');
     }
+  };
+
+  const loadWork = (work: WorkSet) => {
+    setMode(work.mode);
+    setAsOf(work.asOf);
+    setUniverseCsv(work.universeCsv);
+    setMarginCsv(work.marginCsv);
+    setEarningsCsv(work.earningsCsv);
+    setMarketJson(work.marketJson);
+    setPricesByCode(new Map(work.prices));
+    setResult(null);
+    setError(null);
+    setWorkStatus('作業セットを読み込みました');
   };
 
   return (
@@ -166,6 +227,30 @@ export function DataUpdatePage() {
             <p className="mt-2 text-[12px] text-muted">
               読み込み済みの日足CSV: <span className="num">{pricesByCode.size}</span>件
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button type="button" className="btn" onClick={() => downloadJson(`swingscout-work-${asOf}.json`, workSet)}>
+                作業セットを保存
+              </button>
+              <label className="btn cursor-pointer">
+                作業セットを読み込み
+                <input
+                  className="sr-only"
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={async (e) => {
+                    try {
+                      const work = await readWorkSetFile(e.target.files?.[0] ?? null);
+                      if (work) loadWork(work);
+                    } catch (err) {
+                      setWorkStatus(err instanceof Error ? err.message : String(err));
+                    } finally {
+                      e.currentTarget.value = '';
+                    }
+                  }}
+                />
+              </label>
+              {workStatus && <span className="text-[12px] text-accent">{workStatus}</span>}
+            </div>
           </Panel>
 
           <Panel title="銘柄CSV">

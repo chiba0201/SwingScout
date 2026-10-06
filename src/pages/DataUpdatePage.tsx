@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { PageTitle, Panel } from '../components/ui';
 import { buildDatasetInBrowser, type BrowserDatasetResult } from '../lib/browserDatasetBuilder';
 import { formatDateJa } from '../lib/calendar';
+import { csvToRecords } from '../lib/csv';
 import { marketContextFromToday } from '../lib/marketContextFromToday';
 import { useData } from '../state/DataContext';
 import type { MarketContext } from '../types/dataset';
@@ -92,6 +93,13 @@ function statText(result: BrowserDatasetResult | null) {
   return `母集団 ${stats.universe}件 / 日足あり ${stats.withPrices}件 / 足切り通過 ${stats.screened}件 / 保存 ${dataset.candidates.length}件`;
 }
 
+function codesFromUniverseCsv(csv: string): string[] {
+  return csvToRecords(csv)
+    .map((r) => r.code ?? r['コード'] ?? '')
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
 export function DataUpdatePage() {
   const { todayAnalysis, analysis, patternId, datasetOverride, favoritesOverride, setDatasetOverride, setFavoritesOverride } = useData();
   const navigate = useNavigate();
@@ -108,6 +116,8 @@ export function DataUpdatePage() {
   const [result, setResult] = useState<BrowserDatasetResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [workStatus, setWorkStatus] = useState<string | null>(saved ? '前回の作業セットを復元しました' : null);
+  const [priceStatus, setPriceStatus] = useState<string | null>(null);
+  const [fetchingPrices, setFetchingPrices] = useState(false);
 
   const outputFile = mode === 'favorites' ? 'favorites.json' : `${asOf}.json`;
   const market: MarketContext | null = useMemo(() => {
@@ -180,6 +190,31 @@ export function DataUpdatePage() {
     setWorkStatus('作業セットを読み込みました');
   };
 
+  const fetchYahooPrices = async () => {
+    setFetchingPrices(true);
+    setPriceStatus('ローカル補助APIに接続しています…');
+    try {
+      const codes = codesFromUniverseCsv(universeCsv);
+      const res = await fetch('http://127.0.0.1:8787/api/prices/yahoo', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ codes, years: 2, delayMs: 200 }),
+      });
+      const body = (await res.json()) as { prices?: [string, string][]; errors?: { code: string; message: string }[]; error?: string };
+      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+      const next = new Map(pricesByCode);
+      for (const [code, csv] of body.prices ?? []) next.set(code, csv);
+      setPricesByCode(next);
+      const ok = body.prices?.length ?? 0;
+      const ng = body.errors?.length ?? 0;
+      setPriceStatus(`日足取得 ${ok}件${ng ? ` / 失敗 ${ng}件（${body.errors?.slice(0, 3).map((e) => e.code).join(', ')}）` : ''}`);
+    } catch (e) {
+      setPriceStatus(`取得できませんでした：${e instanceof Error ? e.message : String(e)}。別ターミナルで npm run local:api を起動してください。`);
+    } finally {
+      setFetchingPrices(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <PageTitle title="データ更新">
@@ -228,6 +263,9 @@ export function DataUpdatePage() {
               読み込み済みの日足CSV: <span className="num">{pricesByCode.size}</span>件
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button type="button" className="btn" onClick={fetchYahooPrices} disabled={fetchingPrices || !universeCsv.trim()}>
+                {fetchingPrices ? 'Yahoo日足を取得中…' : 'Yahoo日足を取得'}
+              </button>
               <button type="button" className="btn" onClick={() => downloadJson(`swingscout-work-${asOf}.json`, workSet)}>
                 作業セットを保存
               </button>
@@ -249,8 +287,11 @@ export function DataUpdatePage() {
                   }}
                 />
               </label>
-              {workStatus && <span className="text-[12px] text-accent">{workStatus}</span>}
+              {(priceStatus || workStatus) && <span className="text-[12px] text-accent">{priceStatus ?? workStatus}</span>}
             </div>
+            <p className="mt-2 text-[11.5px] text-muted">
+              Yahoo取得はローカル補助APIが必要です。別ターミナルで <span className="font-mono">npm run local:api</span> を起動してください。
+            </p>
           </Panel>
 
           <Panel title="銘柄CSV">

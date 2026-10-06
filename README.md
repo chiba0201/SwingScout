@@ -32,6 +32,7 @@ npm run prices:yahoo                       # raw-data/watchlist.csv の銘柄の
 npm run data:watchlist                     # raw-data/watchlist.csv + prices/*.csv から実データ扱いのJSONを生成
 npm run data:universe                      # raw-data/universe.csv の代表銘柄から上位候補を選定
 npm run data:build -- --provider local     # raw-data/ のローカルファイルから data/<基準日>.json を生成
+npm run local:api                          # データ更新画面からYahoo日足を取得するローカル補助API
 npm run report                             # 既定データセットから reports/<基準日>-<パターン>.md / .html / -sns.txt を生成
 npm run report -- --detail compact --top 5 # 簡潔版・上位5銘柄
 npm run report -- --today                  # data/today-market.json の「今日の市況」を冒頭に入れる
@@ -53,6 +54,7 @@ npm run market:from-today                  # today-market.json の指標・市�
 | 候補一覧 | `#/candidates` | 上位6／全件のランキング。総合・需給・テクニカル・イベント・リスク、警告タグ（決算またぎ・急騰翌日・同一セクター偏り等）。**スコア配分をスライダーで調整** → その場で再ランキング（ブラウザに保存） |
 | 銘柄詳細 | `#/candidates/:code` | 需給／テクニカル／ファンダ・イベントのコメント、入り方・損切り・利確・見送り条件、価格ラダー、指標ごとのスコア内訳 |
 | レポート | `#/report` | **詳細レポート**：「今週の作戦（火曜In金曜out）」形式の Markdown（コピー / `.md` / `.html`）。「含めるセクション」で**今日の市況**を ON にすると冒頭に Today と市況メモの要点が入る<br>**SNS投稿**：上位銘柄を1位〜6位で短く紹介し、運用メモと注意書きを話し言葉でまとめたプレーンテキスト（1投稿 / X向けスレッド分割、X換算文字数つき、`.txt`）。どちらも手直し可 |
+| データ更新 | `#/data-update` | 銘柄CSV・信用残CSV・決算CSV・地合いJSON・日足CSVから、ブラウザ内で候補JSONを生成。`npm run local:api` 起動中は「Yahoo日足を取得」で日足CSVも画面から取得可能。生成結果はその場でアプリに反映、または `.json` 保存 |
 
 ヘッダーで **データセット**（manifest に登録された日付）と **保有パターン**（火曜In金曜out / 月曜In金曜out / 火曜In木曜out）を切り替えられます。
 ルーティングは `HashRouter`（URL が `#/...`）なので、静的サーバーでも直リンク・リロードが効きます。
@@ -340,6 +342,7 @@ JPX全銘柄一覧や信用残PDFを整える前に、まず `raw-data/universe.
      npm run prices:yahoo -- --watchlist raw-data/universe.csv --years 2
      ```
      このCLIはYahoo Financeの非公式chartエンドポイントを使います。取得に失敗する場合や規約上避けたい場合は、手動でCSVを置いてください。
+   - 画面から取得する場合は、別ターミナルで `npm run local:api` を起動し、データ更新画面の「Yahoo日足を取得」を押します。
 4. `raw-data/margin.csv` の信用残を更新します。列は `code,asOf,buyBalance,sellBalance,buyBalancePrev,sellBalancePrev` です。空でも動きますが、需給コメントと信用倍率スコアは弱くなります。
 5. `raw-data/market.json` をその日の地合いに合わせて更新します。ひな形のままだと指数・為替が0のため、実運用前に必ず一次情報で埋めてください。
    - `data/today-market.json` を先に実市況へ更新した日は、次でも同期できます。

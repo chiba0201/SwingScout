@@ -1,0 +1,24 @@
+{
+  "stance": "neutral",
+  "headline": "実データ運用のひな形です。market.json は毎日または毎週、一次情報を確認して更新してください。",
+  "summaryToday": "指数・為替・VIは手入力のひな形です。Today の市況メモと合わせて確認してください。",
+  "summaryWeek": "週次のイベントと地合いを手入力で更新してください。",
+  "indices": [
+    { "id": "nikkei225", "label": "日経平均", "value": 0, "change": 0, "changePct": 0, "decimals": 0, "polarity": "up-good" },
+    { "id": "topix", "label": "TOPIX", "value": 0, "change": 0, "changePct": 0, "decimals": 1, "polarity": "up-good" }
+  ],
+  "volatility": [
+    { "id": "nikkeiVI", "label": "日経VI", "value": 18, "change": 0, "changePct": 0, "decimals": 2, "polarity": "up-bad" }
+  ],
+  "fx": [
+    { "id": "usdjpy", "label": "ドル円", "value": 0, "change": 0, "changePct": 0, "weekChangePct": 0, "decimals": 2, "unit": "円", "polarity": "neutral" }
+  ],
+  "rates": [
+    { "id": "us10y", "label": "米10年債", "value": 0, "change": 0, "changePct": 0, "decimals": 2, "unit": "%", "polarity": "neutral" }
+  ],
+  "events": [],
+  "sectors": [],
+  "riskNotes": [
+    "実データに切り替えた直後は、価格・決算・信用残・イベントを一次情報で確認してください。"
+  ]
+}

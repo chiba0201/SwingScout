@@ -9,9 +9,10 @@ import { JpxListingCsvSource } from './sources/jpxListing';
 import { JpxMarginPdfSource } from './sources/jpxMargin';
 import { JsonMarketSource } from './sources/jsonMarket';
 import { TdnetDisclosureSource } from './sources/tdnet';
+import { WatchlistCsvSource } from './sources/watchlistCsv';
 import type { ProviderSet } from './types';
 
-export const PROVIDER_IDS = ['mock', 'local'] as const;
+export const PROVIDER_IDS = ['mock', 'local', 'watchlist'] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export function createProviderSet(id: ProviderId, patternId?: string): ProviderSet {
@@ -30,5 +31,20 @@ export function createProviderSet(id: ProviderId, patternId?: string): ProviderS
         disclosures: new TdnetDisclosureSource(),
         market: new JsonMarketSource(),
       };
+    case 'watchlist': {
+      // JPX全銘柄一覧を用意する前に、raw-data/watchlist.csv の監視銘柄だけで始める構成
+      const watchlist = new WatchlistCsvSource();
+      return {
+        id: 'watchlist',
+        isSample: false,
+        universe: watchlist,
+        prices: new CsvPriceSource(),
+        margin: new JpxMarginPdfSource(),
+        earnings: new CsvEarningsSource(),
+        disclosures: new TdnetDisclosureSource(),
+        market: new JsonMarketSource(),
+        annotations: watchlist,
+      };
+    }
   }
 }

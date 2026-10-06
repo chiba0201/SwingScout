@@ -12,7 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "data:mock": "tsx scripts/build-data.ts --provider mock --out data/mock-candidates.json",
+    "data:watchlist": "tsx scripts/build-data.ts --provider watchlist",
     "data:build": "tsx scripts/build-data.ts",
+    "prices:yahoo": "tsx scripts/fetch-yahoo-prices.ts",
     "report": "tsx scripts/generate-report.ts",
     "today:check": "tsx scripts/check-today.ts"
   },

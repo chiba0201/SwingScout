@@ -5,6 +5,7 @@ import { CandidatesPage } from './pages/CandidatesPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ReportPage } from './pages/ReportPage';
+import { TodayPage } from './pages/TodayPage';
 import { DataProvider } from './state/DataContext';
 
 /**
@@ -18,6 +19,7 @@ export function App() {
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<DashboardPage />} />
+            <Route path="today" element={<TodayPage />} />
             <Route path="candidates" element={<CandidatesPage />} />
             <Route path="candidates/:code" element={<CandidateDetailPage />} />
             <Route path="report" element={<ReportPage />} />

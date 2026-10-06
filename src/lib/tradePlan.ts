@@ -42,6 +42,11 @@ export function roundToTick(price: number, mode: 'nearest' | 'down' | 'up' = 'ne
   return fn(price / tick) * tick;
 }
 
+/** GU の許容幅（%）：値幅（ATR%）の大きい銘柄ほど広め（2〜4%、0.5刻み） */
+export function gapUpTolerancePct(atrPct: number | null): number {
+  return Math.min(4, Math.max(2, Math.round((atrPct ?? 3) * 0.8 * 2) / 2));
+}
+
 type PlanSource = Pick<Candidate, 'price' | 'technical' | 'volume' | 'earnings'>;
 
 export function classifySetup(c: PlanSource, m: DerivedMetrics): SetupType {
@@ -69,10 +74,9 @@ export function buildTradePlan(
   const { close, high20d } = c.price;
   const { atr14: atr, ma5, ma25 } = c.technical;
   const setup = classifySetup(c, m);
-  const atrPct = m.atrPct ?? 3;
+  const atrPct = m.atrPct;
 
-  // GU の許容幅：値幅の大きい銘柄ほど広め（2〜4%）
-  const guPct = Math.min(4, Math.max(2, Math.round(atrPct * 0.8 * 2) / 2));
+  const guPct = gapUpTolerancePct(atrPct);
   const guPrice = roundToTick(close * (1 + guPct / 100));
   const gapUpRule = `前日終値比+${guPct}%（${formatPrice(guPrice)}円）超のGUは寄りで追わず、5分足でVWAPを回復してからの押しを待つ。+${guPct * 2}%超は見送り。`;
 

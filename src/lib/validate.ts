@@ -2,6 +2,7 @@
  * データセットの構造チェック（ブラウザ・Node 共通。import.meta.env に依存しない）。
  */
 import { SCHEMA_VERSION, type Dataset } from '../types/dataset';
+import { TODAY_SCHEMA_VERSION, type TodayMarket } from '../types/today';
 
 export class DataLoadError extends Error {
   constructor(
@@ -35,4 +36,33 @@ export function validateDataset(json: unknown, file = 'dataset'): Dataset {
     }
   });
   return json as unknown as Dataset;
+}
+
+/** data/today-market.json の構造チェック */
+export function validateTodayMarket(json: unknown, file = 'today-market.json'): TodayMarket {
+  const fail = (what: string): never => {
+    throw new DataLoadError(`${file}: ${what}`, 'src/types/today.ts の TodayMarket 型と照合してください。');
+  };
+  if (!isObject(json)) return fail('オブジェクトではありません');
+  if (!isObject(json.meta)) return fail('meta がありません');
+  if (json.meta.schemaVersion !== TODAY_SCHEMA_VERSION) {
+    return fail(`schemaVersion が ${String(json.meta.schemaVersion)} です（期待値 ${TODAY_SCHEMA_VERSION}）`);
+  }
+  if (typeof json.asOf !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(json.asOf)) return fail('asOf が YYYY-MM-DD ではありません');
+  for (const key of ['session', 'stance', 'headline'] as const) {
+    if (typeof json[key] !== 'string' || json[key] === '') fail(`${key} がありません`);
+  }
+  if (!isObject(json.expectedOpen) || typeof json.expectedOpen.gapPct !== 'number' || typeof json.expectedOpen.label !== 'string') {
+    fail('expectedOpen（label, gapPct）が不足しています');
+  }
+  if (!isObject(json.positionSize) || typeof json.positionSize.label !== 'string') fail('positionSize.label がありません');
+  for (const key of ['externalQuotes', 'scenarios', 'events', 'domesticNotes'] as const) {
+    if (!Array.isArray(json[key])) fail(`${key} が配列ではありません`);
+  }
+  const rules = json.watchlistRules;
+  if (!isObject(rules) || typeof rules.gapUpAllowedPct !== 'number' || typeof rules.avoidIfRiskScoreOver !== 'number') {
+    fail('watchlistRules（gapUpAllowedPct, avoidIfRiskScoreOver）が不足しています');
+  }
+  if (json.memoMarkdown !== undefined && typeof json.memoMarkdown !== 'string') fail('memoMarkdown は文字列で指定してください');
+  return json as unknown as TodayMarket;
 }

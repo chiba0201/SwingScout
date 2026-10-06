@@ -1,6 +1,8 @@
 /**
  * レポート生成画面。
- * 設定 → generateWeeklyReport() で Markdown を作り、テキストエリアで手直ししてコピー／保存する。
+ *   詳細レポート … generateWeeklyReport() の Markdown（コピー / .md / .html）
+ *   SNS投稿     … generateSnsPost() のプレーンテキスト（コピー / .txt、X の文字数目安つき）
+ * どちらもテキストエリアで手直しでき、手直し内容はモードごとに保持する。
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cx, PageTitle } from '../components/ui';
@@ -12,9 +14,25 @@ import {
   type ReportOptions,
   type ReportSections,
 } from '../lib/reportGenerator';
-import { useAnalysis } from '../state/DataContext';
+import {
+  countXWeight,
+  DEFAULT_SNS_OPTIONS,
+  generateSnsPost,
+  splitThread,
+  X_WEIGHTED_LIMIT,
+  type SnsPostOptions,
+} from '../lib/snsPostGenerator';
+import { useAnalysis, useData } from '../state/DataContext';
+
+type Mode = 'report' | 'sns';
+
+const MODES: { id: Mode; label: string }[] = [
+  { id: 'report', label: '詳細レポート' },
+  { id: 'sns', label: 'SNS投稿' },
+];
 
 const SECTION_LABELS: Record<keyof ReportSections, string> = {
+  today: '今日の市況',
   market: '地合い',
   events: 'イベント表',
   picks: '銘柄解説',
@@ -43,12 +61,61 @@ async function copyText(text: string, fallback: HTMLTextAreaElement | null): Pro
   }
 }
 
+function Checkbox({ checked, onChange, children }: { checked: boolean; onChange: (v: boolean) => void; children: string }) {
+  return (
+    <label className="inline-flex items-center gap-1.5">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="accent-[var(--c-accent)]"
+      />
+      {children}
+    </label>
+  );
+}
+
+/** SNS投稿のプレビュー：投稿ごとのカードと X の文字数目安 */
+function SnsPreview({ text, thread }: { text: string; thread: boolean }) {
+  const posts = thread ? splitThread(text) : [text.trim()];
+  return (
+    <div className="space-y-3">
+      {posts.map((post, i) => {
+        const weight = countXWeight(post);
+        const over = weight > X_WEIGHTED_LIMIT;
+        return (
+          <article key={i} className="rounded-md border border-rule bg-panel-2/50">
+            <p className="px-4 py-3 text-[13.5px] leading-relaxed break-words whitespace-pre-wrap text-ink">{post}</p>
+            <footer className="flex items-center justify-between border-t border-rule px-4 py-1.5 text-[11px]">
+              <span className="text-muted">{thread ? `投稿 ${i + 1} / ${posts.length}` : '1投稿'}</span>
+              <span className={cx('num', over ? 'font-bold text-caution' : 'text-muted')}>
+                X換算 {weight} / {X_WEIGHTED_LIMIT}
+                {over && '（超過）'}
+              </span>
+            </footer>
+          </article>
+        );
+      })}
+      {!thread && countXWeight(text) > X_WEIGHTED_LIMIT && (
+        <p className="text-[11.5px] text-muted">
+          X の通常アカウントは全角140字（換算280）まで。長文投稿に対応した SNS 以外では「スレッドに分割」を使ってください。
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function ReportPage() {
   const base = useAnalysis();
+  const { todayAnalysis, memo } = useData();
+  const [mode, setMode] = useState<Mode>('report');
   const [topN, setTopN] = useState(base.options.topN);
-  const [options, setOptions] = useState<ReportOptions>(DEFAULT_REPORT_OPTIONS);
-  const [draft, setDraft] = useState('');
-  const [dirty, setDirty] = useState(false);
+  const [reportOptions, setReportOptions] = useState<ReportOptions>(DEFAULT_REPORT_OPTIONS);
+  const [snsOptions, setSnsOptions] = useState<SnsPostOptions>(DEFAULT_SNS_OPTIONS);
+  const [drafts, setDrafts] = useState<Record<Mode, { text: string; dirty: boolean }>>({
+    report: { text: '', dirty: false },
+    sns: { text: '', dirty: false },
+  });
   const [view, setView] = useState<'edit' | 'preview'>('edit');
   const [notice, setNotice] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -57,42 +124,77 @@ export function ReportPage() {
     () => (topN === base.options.topN ? base : analyzeDataset(base.dataset, { ...base.options, topN })),
     [base, topN],
   );
-  const generated = useMemo(() => generateWeeklyReport(analysis, options), [analysis, options]);
+  const generated = useMemo(
+    () =>
+      mode === 'report'
+        ? generateWeeklyReport(analysis, reportOptions, { today: todayAnalysis, memo })
+        : generateSnsPost(analysis, snsOptions),
+    [mode, analysis, reportOptions, snsOptions, todayAnalysis, memo],
+  );
 
+  const draft = drafts[mode];
   // 手直ししていなければ、設定の変更をそのまま反映する
   useEffect(() => {
-    if (!dirty) setDraft(generated);
-  }, [generated, dirty]);
+    if (!draft.dirty && draft.text !== generated) {
+      setDrafts((d) => ({ ...d, [mode]: { text: generated, dirty: false } }));
+    }
+  }, [mode, generated, draft]);
 
-  const previewHtml = useMemo(() => renderMarkdown(draft), [draft]);
+  const previewHtml = useMemo(() => (mode === 'report' ? renderMarkdown(draft.text) : ''), [mode, draft.text]);
   const fileBase = `${analysis.dataset.asOf}-${analysis.window.pattern.id}`;
-  const outOfSync = dirty && draft !== generated;
+  const outOfSync = draft.dirty && draft.text !== generated;
+  const isThread = mode === 'sns' && snsOptions.layout === 'thread';
 
   const flash = (msg: string) => {
     setNotice(msg);
     setTimeout(() => setNotice(null), 2200);
   };
-
+  const setText = (text: string) => setDrafts((d) => ({ ...d, [mode]: { text, dirty: true } }));
+  const regenerate = () => setDrafts((d) => ({ ...d, [mode]: { text: generated, dirty: false } }));
   const setSection = (key: keyof ReportSections, value: boolean) =>
-    setOptions((o) => ({ ...o, sections: { ...o.sections, [key]: value } }));
+    setReportOptions((o) => ({ ...o, sections: { ...o.sections, [key]: value } }));
 
   return (
     <div className="space-y-4">
       <PageTitle title="レポート生成">
-        <span className="text-[12px] text-muted">「今週の作戦」形式の Markdown を作成</span>
+        <div role="radiogroup" aria-label="出力形式" className="inline-flex rounded border border-rule-strong bg-panel p-0.5">
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              role="radio"
+              aria-checked={mode === m.id}
+              onClick={() => setMode(m.id)}
+              className={cx(
+                'rounded-sm px-3 py-1 text-[12px] font-semibold',
+                mode === m.id ? 'bg-accent text-panel' : 'text-ink-2 hover:text-ink',
+              )}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
       </PageTitle>
 
       {/* 設定 */}
-      <section className="panel px-4 py-3" aria-label="レポート設定">
+      <section className="panel px-4 py-3" aria-label="出力設定">
         <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
           <label className="block min-w-[14rem] flex-1 text-[12px]">
             <span className="text-ink-2">タイトル</span>
             <input
               type="text"
               className="field mt-1 w-full"
-              placeholder={`今週の作戦（${analysis.window.pattern.label}）`}
-              value={options.title ?? ''}
-              onChange={(e) => setOptions((o) => ({ ...o, title: e.target.value }))}
+              placeholder={
+                mode === 'report'
+                  ? `今週の作戦（${analysis.window.pattern.label}）`
+                  : `今週の作戦｜${analysis.window.pattern.label}`
+              }
+              value={(mode === 'report' ? reportOptions.title : snsOptions.title) ?? ''}
+              onChange={(e) =>
+                mode === 'report'
+                  ? setReportOptions((o) => ({ ...o, title: e.target.value }))
+                  : setSnsOptions((o) => ({ ...o, title: e.target.value }))
+              }
             />
           </label>
           <label className="block text-[12px]">
@@ -105,33 +207,67 @@ export function ReportPage() {
               ))}
             </select>
           </label>
-          <label className="block text-[12px]">
-            <span className="text-ink-2">銘柄解説</span>
-            <select
-              className="field mt-1 block"
-              value={options.detail}
-              onChange={(e) => setOptions((o) => ({ ...o, detail: e.target.value as ReportOptions['detail'] }))}
-            >
-              <option value="full">詳細（全項目）</option>
-              <option value="compact">簡潔（1銘柄3行）</option>
-            </select>
-          </label>
-          <fieldset className="text-[12px]">
-            <legend className="text-ink-2">含めるセクション</legend>
-            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-              {(Object.keys(SECTION_LABELS) as (keyof ReportSections)[]).map((key) => (
-                <label key={key} className="inline-flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={options.sections[key]}
-                    onChange={(e) => setSection(key, e.target.checked)}
-                    className="accent-[var(--c-accent)]"
-                  />
-                  {SECTION_LABELS[key]}
-                </label>
-              ))}
-            </div>
-          </fieldset>
+
+          {mode === 'report' ? (
+            <>
+              <label className="block text-[12px]">
+                <span className="text-ink-2">銘柄解説</span>
+                <select
+                  className="field mt-1 block"
+                  value={reportOptions.detail}
+                  onChange={(e) => setReportOptions((o) => ({ ...o, detail: e.target.value as ReportOptions['detail'] }))}
+                >
+                  <option value="full">詳細（全項目）</option>
+                  <option value="compact">簡潔（1銘柄3行）</option>
+                </select>
+              </label>
+              <fieldset className="text-[12px]">
+                <legend className="text-ink-2">含めるセクション</legend>
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+                  {(Object.keys(SECTION_LABELS) as (keyof ReportSections)[]).map((key) => (
+                    <Checkbox key={key} checked={reportOptions.sections[key]} onChange={(v) => setSection(key, v)}>
+                      {key === 'today' && !todayAnalysis && !memo ? `${SECTION_LABELS[key]}（データなし）` : SECTION_LABELS[key]}
+                    </Checkbox>
+                  ))}
+                </div>
+              </fieldset>
+            </>
+          ) : (
+            <>
+              <label className="block text-[12px]">
+                <span className="text-ink-2">投稿の形</span>
+                <select
+                  className="field mt-1 block"
+                  value={snsOptions.layout}
+                  onChange={(e) => setSnsOptions((o) => ({ ...o, layout: e.target.value as SnsPostOptions['layout'] }))}
+                >
+                  <option value="single">1投稿にまとめる</option>
+                  <option value="thread">スレッドに分割（X向け）</option>
+                </select>
+              </label>
+              <label className="block min-w-[12rem] text-[12px]">
+                <span className="text-ink-2">ハッシュタグ</span>
+                <input
+                  type="text"
+                  className="field mt-1 w-full"
+                  placeholder="なし"
+                  value={snsOptions.hashtags}
+                  onChange={(e) => setSnsOptions((o) => ({ ...o, hashtags: e.target.value }))}
+                />
+              </label>
+              <fieldset className="text-[12px]">
+                <legend className="text-ink-2">内容</legend>
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+                  <Checkbox checked={snsOptions.includeLevels} onChange={(v) => setSnsOptions((o) => ({ ...o, includeLevels: v }))}>
+                    損切り・利確の価格
+                  </Checkbox>
+                  <Checkbox checked={snsOptions.emoji} onChange={(v) => setSnsOptions((o) => ({ ...o, emoji: v }))}>
+                    絵文字
+                  </Checkbox>
+                </div>
+              </fieldset>
+            </>
+          )}
         </div>
       </section>
 
@@ -140,29 +276,37 @@ export function ReportPage() {
         <button
           type="button"
           className="btn btn-primary"
-          onClick={async () => flash((await copyText(draft, textareaRef.current)) ? 'コピーしました' : 'コピーできませんでした。テキストを選択してコピーしてください')}
+          onClick={async () =>
+            flash(
+              (await copyText(draft.text, textareaRef.current))
+                ? 'コピーしました'
+                : 'コピーできませんでした。テキストを選択してコピーしてください',
+            )
+          }
         >
-          Markdownをコピー
+          {mode === 'report' ? 'Markdownをコピー' : '投稿文をコピー'}
         </button>
-        <button type="button" className="btn" onClick={() => download(`${fileBase}.md`, draft, 'text/markdown;charset=utf-8')}>
-          .md を保存
-        </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => download(`${fileBase}.html`, buildStandaloneHtml(extractTitle(draft), draft), 'text/html;charset=utf-8')}
-        >
-          .html を保存
-        </button>
-        <button
-          type="button"
-          className="btn"
-          disabled={!dirty}
-          onClick={() => {
-            setDirty(false);
-            setDraft(generated);
-          }}
-        >
+        {mode === 'report' ? (
+          <>
+            <button type="button" className="btn" onClick={() => download(`${fileBase}.md`, draft.text, 'text/markdown;charset=utf-8')}>
+              .md を保存
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() =>
+                download(`${fileBase}.html`, buildStandaloneHtml(extractTitle(draft.text), draft.text), 'text/html;charset=utf-8')
+              }
+            >
+              .html を保存
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn" onClick={() => download(`${fileBase}-sns.txt`, draft.text, 'text/plain;charset=utf-8')}>
+            .txt を保存
+          </button>
+        )}
+        <button type="button" className="btn" disabled={!draft.dirty} onClick={regenerate}>
           手直しを破棄して再生成
         </button>
         <span role="status" className="text-[12px] font-semibold text-accent">
@@ -187,33 +331,42 @@ export function ReportPage() {
               view === v ? 'border-accent text-accent' : 'border-transparent text-ink-2',
             )}
           >
-            {v === 'edit' ? 'Markdown' : 'プレビュー'}
+            {v === 'edit' ? (mode === 'report' ? 'Markdown' : '投稿文') : 'プレビュー'}
           </button>
         ))}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <section className={cx('panel flex flex-col overflow-hidden', view !== 'edit' && 'hidden lg:flex')} aria-label="Markdown">
+        <section className={cx('panel flex flex-col overflow-hidden', view !== 'edit' && 'hidden lg:flex')} aria-label="編集">
           <header className="flex items-center justify-between border-b border-rule px-4 py-2 text-[12px]">
-            <span className="font-bold">Markdown</span>
-            <span className="num text-muted">{draft.length.toLocaleString()}文字</span>
+            <span className="font-bold">{mode === 'report' ? 'Markdown' : '投稿文'}</span>
+            <span className="num text-muted">
+              {draft.text.length.toLocaleString()}文字
+              {isThread && '（「-----」の行が投稿の区切り）'}
+            </span>
           </header>
           <textarea
             ref={textareaRef}
-            value={draft}
-            onChange={(e) => {
-              setDraft(e.target.value);
-              setDirty(true);
-            }}
+            value={draft.text}
+            onChange={(e) => setText(e.target.value)}
             spellCheck={false}
-            className="num min-h-[60vh] w-full flex-1 resize-y bg-panel px-4 py-3 text-[12.5px] leading-relaxed text-ink outline-none lg:min-h-[72vh]"
-            aria-label="レポートのMarkdown（編集可）"
+            className={cx(
+              'min-h-[60vh] w-full flex-1 resize-y bg-panel px-4 py-3 leading-relaxed text-ink outline-none lg:min-h-[72vh]',
+              mode === 'report' ? 'num text-[12.5px]' : 'text-[13px]',
+            )}
+            aria-label={mode === 'report' ? 'レポートのMarkdown（編集可）' : 'SNS投稿文（編集可）'}
           />
         </section>
         <section className={cx('panel overflow-hidden', view !== 'preview' && 'hidden lg:block')} aria-label="プレビュー">
           <header className="border-b border-rule px-4 py-2 text-[12px] font-bold">プレビュー</header>
-          {/* renderMarkdown は生HTMLをエスケープ済み */}
-          <div className="md-preview max-h-[72vh] overflow-y-auto px-5 py-4" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          {mode === 'report' ? (
+            // renderMarkdown は生HTMLをエスケープ済み
+            <div className="md-preview max-h-[72vh] overflow-y-auto px-5 py-4" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+          ) : (
+            <div className="max-h-[72vh] overflow-y-auto px-4 py-4">
+              <SnsPreview text={draft.text} thread={isThread} />
+            </div>
+          )}
         </section>
       </div>
     </div>

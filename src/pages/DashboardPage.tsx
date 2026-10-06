@@ -1,16 +1,18 @@
 import { Link } from 'react-router';
 import { CandidateTable } from '../components/CandidateTable';
 import { SectorBars } from '../components/charts';
-import { QuoteGrid } from '../components/QuoteGrid';
+import { DASHBOARD_QUOTE_ORDER, QuoteGrid } from '../components/QuoteGrid';
+import { TodaySummaryCard } from '../components/TodaySummary';
 import { Panel, StanceBadge } from '../components/ui';
 import { WeekBoard } from '../components/WeekBoard';
 import { formatDateJa } from '../lib/calendar';
 import { viRegime } from '../lib/market';
 import { findQuote } from '../lib/scoring';
-import { useAnalysis } from '../state/DataContext';
+import { useAnalysis, useData } from '../state/DataContext';
 
 export function DashboardPage() {
   const a = useAnalysis();
+  const { todayAnalysis, todayLoad } = useData();
   const mc = a.dataset.marketContext;
   const vi = findQuote(mc, 'nikkeiVI');
   const regime = vi ? viRegime(vi.value) : null;
@@ -18,6 +20,9 @@ export function DashboardPage() {
   return (
     <div className="space-y-4">
       <h1 className="sr-only">ダッシュボード</h1>
+
+      {/* 今日の結論（要約のみ。詳細は Today 画面） */}
+      <TodaySummaryCard analysis={todayAnalysis} load={todayLoad} />
 
       {/* 地合いサマリー */}
       <section className="panel overflow-hidden" aria-label="地合いサマリー">
@@ -65,7 +70,10 @@ export function DashboardPage() {
         </div>
       </section>
 
-      <QuoteGrid market={mc} />
+      <QuoteGrid
+        quotes={[...mc.indices, ...mc.volatility, ...mc.fx, ...mc.rates]}
+        order={DASHBOARD_QUOTE_ORDER}
+      />
 
       <WeekBoard analysis={a} />
 

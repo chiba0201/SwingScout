@@ -8,6 +8,7 @@ import { cx, SampleBadge } from './ui';
 
 const NAV = [
   { to: '/', label: 'ダッシュボード', end: true },
+  { to: '/today', label: 'Today', end: false },
   { to: '/candidates', label: '候補一覧', end: false },
   { to: '/report', label: 'レポート', end: false },
 ];

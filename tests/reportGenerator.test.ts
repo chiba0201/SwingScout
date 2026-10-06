@@ -37,7 +37,7 @@ describe('generateWeeklyReport', () => {
     const compact = generateWeeklyReport(analysis, {
       ...DEFAULT_REPORT_OPTIONS,
       detail: 'compact',
-      sections: { market: false, events: false, picks: true, operations: false, table: false },
+      sections: { today: false, market: false, events: false, picks: true, operations: false, table: false },
     });
     expect(compact).not.toContain('## 地合い');
     expect(compact).not.toContain('## 運用上の注意');

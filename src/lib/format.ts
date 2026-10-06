@@ -8,6 +8,12 @@ export function formatNumber(n: number | null | undefined, digits = 0): string {
   return nf(digits).format(n);
 }
 
+/** 値から小数桁を推定する（decimals 未指定の Quote 用。最大2桁） */
+export function inferDecimals(n: number): number {
+  const frac = String(n).split('.')[1];
+  return frac ? Math.min(frac.length, 2) : 0;
+}
+
 /** 株価。小数があれば1桁まで */
 export function formatPrice(n: number | null | undefined): string {
   if (n === null || n === undefined || Number.isNaN(n)) return '—';

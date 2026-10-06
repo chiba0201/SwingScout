@@ -47,7 +47,9 @@ function staticDataDir(): Plugin {
           res.setHeader('Cache-Control', 'no-store');
           res.end(body);
         } catch {
-          next();
+          // 本番の静的サーバーと同じく 404 を返す（SPA フォールバックで index.html を返さない）
+          res.statusCode = 404;
+          res.end('Not Found');
         }
       });
     },

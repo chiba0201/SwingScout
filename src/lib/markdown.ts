@@ -1,8 +1,11 @@
 /**
  * Markdown → HTML 変換（ブラウザ・Node 共通）。
- * データ由来の文字列に HTML が混ざっても実行されないよう、生HTMLはエスケープして表示する。
+ * 貼り付けた市況メモなど外部由来の Markdown も通すため、次の方針で安全側に倒している。
+ *   - 生HTMLはエスケープして表示（実行しない）
+ *   - 画像は読み込まない（外部通信になるため）。代替テキストだけ表示
+ *   - リンクは http(s) / mailto / ページ内 # のみ有効。新しいタブで開く
  */
-import { Marked } from 'marked';
+import { Marked, type Tokens } from 'marked';
 
 export function escapeHtml(s: string): string {
   return s
@@ -14,9 +17,19 @@ export function escapeHtml(s: string): string {
 }
 
 const marked = new Marked({ gfm: true, breaks: false });
+const SAFE_HREF = /^(https?:|mailto:|#)/i;
+
 marked.use({
   renderer: {
     html: ({ text }) => escapeHtml(text),
+    link(token: Tokens.Link) {
+      const label = this.parser.parseInline(token.tokens);
+      if (!SAFE_HREF.test(token.href)) return label;
+      const title = token.title ? ` title="${escapeHtml(token.title)}"` : '';
+      const external = token.href.startsWith('#') ? '' : ' target="_blank" rel="noopener noreferrer"';
+      return `<a href="${escapeHtml(token.href)}"${title}${external}>${label}</a>`;
+    },
+    image: ({ text }) => escapeHtml(text ? `［画像: ${text}］` : '［画像］'),
   },
 });
 

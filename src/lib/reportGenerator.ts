@@ -10,8 +10,11 @@ import { formatDateTime, formatNumber, formatPct, formatPrice, formatScore, form
 import { STANCE_LABELS, viRegime } from './market';
 import { findQuote } from './scoring';
 import type { Quote } from '../types/dataset';
+import { renderTodaySection, type TodaySectionInput } from './todayReportGenerator';
 
 export interface ReportSections {
+  /** 今日の市況（Today）。ヘッダー直後に入る */
+  today: boolean;
   market: boolean;
   events: boolean;
   picks: boolean;
@@ -29,7 +32,7 @@ export interface ReportOptions {
 
 export const DEFAULT_REPORT_OPTIONS: ReportOptions = {
   detail: 'full',
-  sections: { market: true, events: true, picks: true, operations: true, table: true },
+  sections: { today: false, market: true, events: true, picks: true, operations: true, table: true },
 };
 
 export const DISCLAIMER =
@@ -278,12 +281,17 @@ export function renderSummaryTable(a: DatasetAnalysis): string {
 // 入口
 // ---------------------------------------------------------------------------
 
+/** 週次レポート以外のデータ源（Today など）。sections.today が true のときに使う */
+export type ReportExtras = Partial<TodaySectionInput>;
+
 export function generateWeeklyReport(
   analysis: DatasetAnalysis,
   options: ReportOptions = DEFAULT_REPORT_OPTIONS,
+  extras: ReportExtras = {},
 ): string {
   const { sections } = options;
   const blocks = [renderHeader(analysis, options)];
+  if (sections.today) blocks.push(renderTodaySection({ today: extras.today ?? null, memo: extras.memo }));
   if (sections.market) blocks.push(renderMarket(analysis));
   if (sections.events) blocks.push(renderEvents(analysis));
   if (sections.picks) blocks.push(renderPicks(analysis, options));

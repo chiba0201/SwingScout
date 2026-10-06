@@ -3,13 +3,17 @@
  * 相対パスで fetch するので、さくらのサブディレクトリ配置でもそのまま動く。
  */
 import type { DataManifest, Dataset } from '../types/dataset';
-import { DataLoadError, isObject, validateDataset } from './validate';
+import type { TodayMarket } from '../types/today';
+import { DataLoadError, isObject, validateDataset, validateTodayMarket } from './validate';
 
 export { DataLoadError };
 
 const DATA_BASE = `${import.meta.env.BASE_URL}data/`;
 
-async function fetchJson(file: string): Promise<unknown> {
+async function fetchJson(
+  file: string,
+  notFoundHint = 'data/ に JSON があるか確認してください（npm run data:mock でサンプルを再生成できます）。',
+): Promise<unknown> {
   const url = `${DATA_BASE}${file}`;
   let res: Response;
   try {
@@ -22,15 +26,12 @@ async function fetchJson(file: string): Promise<unknown> {
     );
   }
   if (!res.ok) {
-    throw new DataLoadError(
-      `${url} の取得に失敗しました（HTTP ${res.status}）。`,
-      'data/ に JSON があるか確認してください（npm run data:mock でサンプルを再生成できます）。',
-    );
+    throw new DataLoadError(`${url} の取得に失敗しました（HTTP ${res.status}）。`, notFoundHint);
   }
   try {
     return await res.json();
   } catch {
-    throw new DataLoadError(`${url} がJSONとして読めません。`);
+    throw new DataLoadError(`${url} がJSONとして読めません。`, 'JSONの書式（カンマ・括弧・引用符）が壊れていないか確認してください。');
   }
 }
 
@@ -44,4 +45,12 @@ export async function loadManifest(): Promise<DataManifest> {
 
 export async function loadDataset(file: string): Promise<Dataset> {
   return validateDataset(await fetchJson(file), file);
+}
+
+/** Today（当日の市況）は毎朝上書きする1ファイル運用 */
+export const TODAY_FILE = 'today-market.json';
+
+export async function loadTodayMarket(): Promise<TodayMarket> {
+  const hint = 'data/today-market.json を配置してください（形式は src/types/today.ts、README の「Today」を参照）。';
+  return validateTodayMarket(await fetchJson(TODAY_FILE, hint), TODAY_FILE);
 }

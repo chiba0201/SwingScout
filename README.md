@@ -29,8 +29,10 @@ npm test           # ロジックのユニットテスト（vitest）
 ```bash
 npm run data:mock                          # サンプルデータを data/mock-candidates.json に再生成
 npm run data:build -- --provider local     # raw-data/ のローカルファイルから data/<基準日>.json を生成
-npm run report                             # 既定データセットから reports/<基準日>-<パターン>.md / .html を生成
+npm run report                             # 既定データセットから reports/<基準日>-<パターン>.md / .html / -sns.txt を生成
 npm run report -- --detail compact --top 5 # 簡潔版・上位5銘柄
+npm run report -- --today                  # data/today-market.json の「今日の市況」を冒頭に入れる
+npm run today:check                        # data/today-market.json を検証し、監視銘柄の判定結果を表示
 ```
 
 `npm run dev` 中に `data/*.json` を更新すると、ブラウザは自動でリロードされます。
@@ -41,10 +43,11 @@ npm run report -- --detail compact --top 5 # 簡潔版・上位5銘柄
 
 | 画面 | パス | 内容 |
 |---|---|---|
-| ダッシュボード | `#/` | 地合いサマリー（スタンス・今日/今週・VIに応じたサイズ目安）、指数・VI・為替・金利、**今週の作戦ボード**（IN→OUTの保有帯とイベント）、上位6銘柄、業種別騰落 |
+| ダッシュボード | `#/` | 最上部に**今日の結論**の要約カード（Today へのリンク）。地合いサマリー（スタンス・今日/今週・VIに応じたサイズ目安）、指数・VI・為替・金利、**今週の作戦ボード**（IN→OUTの保有帯とイベント）、上位6銘柄、業種別騰落 |
+| Today | `#/today` | **今日の寄り前・場中の判断用（朝の1分で読む順）**：① 今日の結論（一言・スタンス・想定寄り・サイズ目安・日経VI）→ ② 外部指標 → ③ 今日の監視銘柄（寄り追いOK／押し目待ち／見送り。理由・注意点は2行表示、ボタンで全文）→ ④ 寄り付きシナリオ → ⑤ 今日の重要イベント／国内材料 → ⑥ 市況メモ詳細（既定で閉じる。要確認・抽出結果・参照元・原文・貼り付け欄） |
 | 候補一覧 | `#/candidates` | 上位6／全件のランキング。総合・需給・テクニカル・イベント・リスク、警告タグ（決算またぎ・急騰翌日・同一セクター偏り等）。**スコア配分をスライダーで調整** → その場で再ランキング（ブラウザに保存） |
 | 銘柄詳細 | `#/candidates/:code` | 需給／テクニカル／ファンダ・イベントのコメント、入り方・損切り・利確・見送り条件、価格ラダー、指標ごとのスコア内訳 |
-| レポート | `#/report` | 「今週の作戦（火曜In金曜out）」形式の Markdown を生成。テキストエリアで手直し → コピー / `.md` / `.html` 保存、プレビュー |
+| レポート | `#/report` | **詳細レポート**：「今週の作戦（火曜In金曜out）」形式の Markdown（コピー / `.md` / `.html`）。「含めるセクション」で**今日の市況**を ON にすると冒頭に Today と市況メモの要点が入る<br>**SNS投稿**：上位銘柄を1位〜6位で短く紹介し、運用メモと注意書きを話し言葉でまとめたプレーンテキスト（1投稿 / X向けスレッド分割、X換算文字数つき、`.txt`）。どちらも手直し可 |
 
 ヘッダーで **データセット**（manifest に登録された日付）と **保有パターン**（火曜In金曜out / 月曜In金曜out / 火曜In木曜out）を切り替えられます。
 ルーティングは `HashRouter`（URL が `#/...`）なので、静的サーバーでも直リンク・リロードが効きます。
@@ -57,7 +60,8 @@ npm run report -- --detail compact --top 5 # 簡潔版・上位5銘柄
 SwingScout/
 ├─ data/                       # フロントが読む静的JSON（dist/data/ にそのままコピーされる）
 │  ├─ manifest.json            #   データセット一覧と既定ファイル
-│  └─ mock-candidates.json     #   サンプル（架空銘柄）
+│  ├─ mock-candidates.json     #   サンプル（架空銘柄）
+│  └─ today-market.json        #   Today（今日の市況）。毎朝上書きする1ファイル
 ├─ raw-data/                   # 実データ用の生ファイル置き場（git・デプロイ対象外）
 ├─ reports/                    # npm run report の出力
 ├─ scripts/                    # ローカルCLI（tsx で実行）
@@ -74,9 +78,14 @@ SwingScout/
 │     └─ sources/              #     JPX・yfinance相当CSV・EDINET・TDnet など
 ├─ src/
 │  ├─ types/dataset.ts         # ★データスキーマ（Dataset / Candidate / MarketContext）
+│  ├─ types/today.ts           # ★Today のスキーマ（TodayMarket）
 │  ├─ lib/                     # UI と CLI で共有する純粋ロジック
 │  │  ├─ scoring.ts            #   ★スコアリング（ファクター定義）
-│  │  ├─ reportGenerator.ts    #   ★レポート生成
+│  │  ├─ reportGenerator.ts    #   ★レポート生成（詳細Markdown）
+│  │  ├─ snsPostGenerator.ts   #   SNS投稿モード（プレーンテキスト・スレッド分割）
+│  │  ├─ todayAnalysis.ts      #   Today：想定シナリオ・イベント・監視銘柄の判定
+│  │  ├─ todayReportGenerator.ts # Today：「今日の市況」Markdown
+│  │  ├─ marketMemo.ts         #   市況メモ（貼り付け Markdown）の抽出
 │  │  ├─ analysis.ts           #   metrics → scoring → warnings → カレンダーの統合
 │  │  ├─ metrics.ts            #   派生指標（出来高倍率・乖離・信用倍率・決算までの日数…）
 │  │  ├─ warnings.ts           #   警告タグの判定と閾値
@@ -89,8 +98,8 @@ SwingScout/
 │  │  ├─ dataLoader.ts / validate.ts
 │  │  └─ format.ts
 │  ├─ state/DataContext.tsx    # 読み込み・重み・保有パターンの状態
-│  ├─ components/              # Layout, WeekBoard, CandidateTable, charts, ui …
-│  └─ pages/                   # Dashboard / Candidates / CandidateDetail / Report
+│  ├─ components/              # Layout, WeekBoard, CandidateTable, Today*, charts, ui …
+│  └─ pages/                   # Dashboard / Today / Candidates / CandidateDetail / Report
 ├─ tests/                      # vitest
 └─ deploy/sakura/htaccess.example
 ```
@@ -201,7 +210,71 @@ SwingScout/
 - 各セクションは `renderMarket()` などの関数に分かれているので、文体の調整・追加はその関数だけ触れば済みます
 - 銘柄ごとの文章（需給・テクニカル等のコメント、入り方・損切り・利確）はデータ生成時に `src/lib/commentary.ts` と `src/lib/tradePlan.ts` で作られ、手書きの `Annotation` があればそちらが優先されます
 
+### SNS投稿モード（`src/lib/snsPostGenerator.ts`）
+
+`generateSnsPost(analysis, options)` がプレーンテキストを返します（Markdown 記法は使わない）。
+
+- 構成：見出し（サンプル時は架空である旨）→ 地合いとサイズ感 → 1位〜N位（セットアップ＋需給/材料の一言、入り方、任意で損切り・利確、警告）→ 運用メモ（相関・決算・急騰翌日・GU・米指標・SQ・連休を話し言葉で）→ 柔らかい注意書き → ハッシュタグ
+- `layout: 'thread'` では各投稿を X の上限（重み付き280）に収まるよう分割し、`(1/12)` の通し番号を付けます。テキストエリアでは `-----` の行が投稿の区切りです
+- 同じ言い回しが続かないよう、言い回しの候補を順に使い回します（`Variety`）。文体を手元の投稿に合わせるときは `ACTION` や各 `*Phrase` 関数・`operationSentences` を書き換えてください
+
 ---
+
+## Today（今日の市況）
+
+スイング（火曜In金曜Out）とは時間軸が違う、**当日の寄り前・場中の判断**のための機能です。
+スイング用の `Dataset` には混ぜず、別ファイル・別型（`src/types/today.ts` の `TodayMarket`）にしています。
+
+```
+data/today-market.json ─┐
+市況メモ（貼り付け）     ├─▶ src/lib/todayAnalysis.ts ─▶ Today 画面 / ダッシュボード要約 / レポート「今日の市況」
+スイング分析の上位候補 ──┘        （判定）                    （todayReportGenerator.ts で Markdown 化）
+```
+
+### data/today-market.json の運用方針
+
+- **毎朝1ファイルを上書き**する運用（過去分は残さない。残したい場合は日付付きでコピーして手元で保管）
+- 寄り前（8時台）に作成 → `npm run today:check` で検証 → `data/today-market.json` だけをアップロード
+- 作り方は手入力、または ChatGPT 等で作った内容を下記の形式に整える（アプリ自体は外部通信・AI API を使わない）
+- `meta.isSample: true` の間は画面・レポートに「サンプルデータ」と表示される。実運用では `false` にする
+- 読み込めない・壊れている場合も、ダッシュボード・候補一覧・レポートは通常どおり動き、Today 画面にエラー内容が出る
+- 日付（`asOf`）がスイング側の基準日以前だと「更新されているか確認」の注意が出る
+
+主な項目（詳細は `src/types/today.ts`）:
+
+| 項目 | 内容 |
+|---|---|
+| `asOf` / `session` | 対象日と、寄り前・前場・昼休み・後場・引け後 |
+| `stance` | 買い目線 / 押し目待ち / 様子見 / リスクオフ（監視銘柄の判定に使う） |
+| `expectedOpen` | 想定寄り（ラベル・想定ギャップ%・メモ）。ギャップから「想定に近いシナリオ」を強調 |
+| `positionSize` | サイズ目安（ラベル・理由） |
+| `headline` | 一言サマリー |
+| `externalQuotes` | NYダウ・NASDAQ・S&P500・SOX・VIX・日経先物・ドル円・米10年債など（配列の順に表示。`nikkeiVI` を入れると判定に使う。無ければスイング側の前日終値） |
+| `scenarios` | 寄り付きシナリオ。`large-gap-up` / `flat-small-gap` / `gap-down` の id は想定寄りとの照合に使う |
+| `events` / `domesticNotes` | 今日のイベント（時刻・重要度・メモ）と国内材料メモ。SQ日・休場・監視銘柄の決算は自動で追加 |
+| `watchlistRules` | `gapUpAllowedPct`（想定GUがこれを超えたら寄り追いしない）、`avoidIfRiskScoreOver`（リスクスコアがこれ超で見送り） |
+| `memoMarkdown`（任意） | 市況メモの Markdown。画面で貼り付けたメモが無いときに使われる |
+
+### 今日の監視銘柄の判定（`todayAnalysis.ts` の `judgeWatchItem`）
+
+スイングの上位候補それぞれについて、次の順で簡易判定します（閾値は `TODAY_THRESHOLDS` と `watchlistRules`）。
+
+1. **見送り**：スタンスがリスクオフ／リスクスコアが基準超／本日決算
+2. **押し目待ち**：急騰翌日／想定GUが許容超／GD想定／日経VIが22以上／スタンスが買い目線以外／押し目型のセットアップ
+3. **寄り追いOK**：上記に当たらないもの
+
+注意点には警告タグ、翌営業日の決算、銘柄ごとの「寄りで+◯%超なら追わない」（ATR から算出）が入ります。
+
+### 市況メモ（ChatGPT 等の Markdown を貼り付け）
+
+- Today 画面下部の「市況メモ詳細」（既定で閉じる。要確認の件数は閉じたままでも見出し行に出る）→「市況メモを貼り付け」にそのまま貼ると、**ブラウザ（localStorage）に自動保存**し、次を抽出して表示します（`src/lib/marketMemo.ts`、正規表現のみ）
+  - 結論：冒頭の太字文（`**結論**：〜` のようなラベル付きならラベルの後ろ）、無ければ最初の本文
+  - 見出しごとの要点：`##` / `###` / `####` ごとに、箇条書きの先頭3つ、または最初の2文
+  - 表：Markdown テーブル　・参照元：Markdown リンクと裸の URL
+  - 要確認：「未確認」「要確認」「確認が必要」「取得できない」「不明」などがあれば警告（該当行も表示）
+- 抽出できなくても**原文はそのまま**「原文を表示」で確認できます（生HTMLはエスケープ、画像は読み込まない、リンクは http(s) のみ）
+- 貼り付けメモは**そのブラウザだけ**に保存されます。他の端末やさくらの閲覧者にも見せたい場合は `today-market.json` の `memoMarkdown` に入れてください
+- レポートの「今日の市況」には、抽出した要点（要確認・見出し要約・表・参照元）が入り、見出しも表も無いメモは原文冒頭を要約として載せます
 
 ## データ取得の拡張ポイント
 
@@ -267,6 +340,11 @@ rsync -avz data/ <アカウント>@<アカウント>.sakura.ne.jp:~/www/swingsco
 ```
 
 - アプリ本体を変えていなければ **`data/` だけのアップロードで反映**されます（フロントは `cache: 'no-cache'` で取得）
+- Today は毎朝 `data/today-market.json` だけ差し替え：
+  ```bash
+  npm run today:check
+  scp data/today-market.json <アカウント>@<アカウント>.sakura.ne.jp:~/www/swingscout/data/
+  ```
 - アプリを変更したときは `npm run build` して `dist/` ごとアップロード
 
 ### 推奨設定
@@ -294,3 +372,5 @@ rsync -avz data/ <アカウント>@<アカウント>.sakura.ne.jp:~/www/swingsco
 - [ ] TOPIX500 構成銘柄の細かい呼値（`tradePlan.ts` の `tickSize`）
 - [ ] 休場日カレンダーを JPX の公表データから更新（`calendar.ts`）
 - [ ] 過去のレポートと実際の値動きを突き合わせる検証画面
+- [ ] Today：指数・先物・為替を価格ソースから自動で埋め、スタンスと一言だけ手入力にする
+- [ ] Today：場中（前場・後場）用の更新と、監視銘柄の VWAP・出来高の取り込み

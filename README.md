@@ -30,6 +30,7 @@ npm test           # ロジックのユニットテスト（vitest）
 npm run data:mock                          # サンプルデータを data/mock-candidates.json に再生成
 npm run prices:yahoo                       # raw-data/watchlist.csv の銘柄の日足CSVを取得（任意・非公式）
 npm run data:watchlist                     # raw-data/watchlist.csv + prices/*.csv から実データ扱いのJSONを生成
+npm run data:universe                      # raw-data/universe.csv の代表銘柄から上位候補を選定
 npm run data:build -- --provider local     # raw-data/ のローカルファイルから data/<基準日>.json を生成
 npm run report                             # 既定データセットから reports/<基準日>-<パターン>.md / .html / -sns.txt を生成
 npm run report -- --detail compact --top 5 # 簡潔版・上位5銘柄
@@ -292,18 +293,19 @@ data/today-market.json ─┐
 | 地合い | `MarketSource` | `JsonMarketSource` ✅ | 手書き `raw-data/market.json`（将来は指数・為替を自動取得、コメントだけ手書き） |
 | 手書き補足 | `AnnotationSource` | `WatchlistCsvSource` ✅ | テーマ・為替感応度・定性メモ・警告・見送り条件（`raw-data/watchlist.csv`） |
 
-### 最初の実データ化（ウォッチリスト運用）
+### 最初の実データ化（代表銘柄ユニバース運用）
 
-JPX全銘柄一覧や信用残PDFを整える前に、まず監視したい銘柄だけで実データ扱いのデータセットを作れます。
+このツールの本筋は、**いろいろな代表銘柄の母集団からスイングに向いた上位候補を選定する**ことです。
+JPX全銘柄一覧や信用残PDFを整える前に、まず `raw-data/universe.csv` に代表銘柄を並べて、その中から上位6銘柄を選ぶ運用で始められます。
 
 1. ひな形をコピー:
    ```bash
    mkdir -p raw-data/prices
-   cp examples/real-data/watchlist.csv raw-data/watchlist.csv
+   cp examples/real-data/universe.csv raw-data/universe.csv
    cp examples/real-data/earnings.csv raw-data/earnings.csv
    cp examples/real-data/market.json raw-data/market.json
    ```
-2. `raw-data/watchlist.csv` を監視したい銘柄に編集します。
+2. `raw-data/universe.csv` を選定母集団にしたい銘柄に編集します。
    - 必須: `code,name,sector`
    - 任意: `market,theme,usdJpy,beta,fundamentalNote,flags,skipConditions,pattern`
    - `skipConditions` や `flags` は `|` 区切りで複数指定できます。
@@ -311,16 +313,26 @@ JPX全銘柄一覧や信用残PDFを整える前に、まず監視したい銘�
    - 手元で作ったCSVを `raw-data/prices/<code>.csv` に置く
    - もしくは任意補助CLIで取得:
      ```bash
-     npm run prices:yahoo -- --years 2
+     npm run prices:yahoo -- --watchlist raw-data/universe.csv --years 2
      ```
      このCLIはYahoo Financeの非公式chartエンドポイントを使います。取得に失敗する場合や規約上避けたい場合は、手動でCSVを置いてください。
 4. `raw-data/market.json` をその日の地合いに合わせて更新します。ひな形のままだと指数・為替が0のため、実運用前に必ず一次情報で埋めてください。
 5. 実データ扱いのDatasetを生成:
    ```bash
-   npm run data:watchlist -- --as-of 2026-10-06 --label "10/6(火) 実データ"
+   npm run data:universe -- --as-of 2026-10-06 --label "10/6(火) 代表銘柄スクリーニング"
    ```
 
 生成に成功すると `data/2026-10-06.json` と `data/manifest.json` が更新され、ヘッダーのデータセット選択から実データを選べます。`meta.isSample` は `false` になるため、画面のSAMPLE表示は消えます。
+
+### お気に入り銘柄だけを見る（ウォッチリスト運用）
+
+注目している銘柄だけを別枠で見たい場合は、`raw-data/watchlist.csv` を使います。選定母集団を広げる `universe` とは別物です。
+
+```bash
+cp examples/real-data/watchlist.csv raw-data/watchlist.csv
+npm run prices:yahoo -- --watchlist raw-data/watchlist.csv --years 2
+npm run data:watchlist -- --as-of 2026-10-06 --label "10/6(火) お気に入り監視"
+```
 
 `--provider local` は上記のローカルファイル版を組み合わせた構成です（外部通信なし）。最低限 `listing.csv`・`prices/*.csv`・`market.json` を置けば動き、未実装の信用残・材料は空として続行します。
 

@@ -3,6 +3,7 @@
  * 新しいデータ源を足すときは sources/ に実装を置き、ここで組み合わせを追加する。
  */
 import { createMockProviders } from './mock';
+import { resolve } from 'node:path';
 import { CsvEarningsSource } from './sources/csvEarnings';
 import { CsvPriceSource } from './sources/csvPrices';
 import { JpxListingCsvSource } from './sources/jpxListing';
@@ -12,7 +13,7 @@ import { TdnetDisclosureSource } from './sources/tdnet';
 import { WatchlistCsvSource } from './sources/watchlistCsv';
 import type { ProviderSet } from './types';
 
-export const PROVIDER_IDS = ['mock', 'local', 'watchlist'] as const;
+export const PROVIDER_IDS = ['mock', 'local', 'watchlist', 'universe'] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export function createProviderSet(id: ProviderId, patternId?: string): ProviderSet {
@@ -32,7 +33,6 @@ export function createProviderSet(id: ProviderId, patternId?: string): ProviderS
         market: new JsonMarketSource(),
       };
     case 'watchlist': {
-      // JPX全銘柄一覧を用意する前に、raw-data/watchlist.csv の監視銘柄だけで始める構成
       const watchlist = new WatchlistCsvSource();
       return {
         id: 'watchlist',
@@ -44,6 +44,21 @@ export function createProviderSet(id: ProviderId, patternId?: string): ProviderS
         disclosures: new TdnetDisclosureSource(),
         market: new JsonMarketSource(),
         annotations: watchlist,
+      };
+    }
+    case 'universe': {
+      // 代表銘柄ユニバース（raw-data/universe.csv）からスイング候補を選定する構成
+      const universe = new WatchlistCsvSource(resolve('raw-data/universe.csv'));
+      return {
+        id: 'universe',
+        isSample: false,
+        universe,
+        prices: new CsvPriceSource(),
+        margin: new JpxMarginPdfSource(),
+        earnings: new CsvEarningsSource(),
+        disclosures: new TdnetDisclosureSource(),
+        market: new JsonMarketSource(),
+        annotations: universe,
       };
     }
   }

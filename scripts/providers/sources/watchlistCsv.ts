@@ -1,11 +1,12 @@
 /**
  * 最初の実データ運用向けのウォッチリストCSV。
  *
- * 置き場所: raw-data/watchlist.csv
+ * 置き場所: raw-data/watchlist.csv または raw-data/universe.csv
  * 必須列: code, name, sector
  * 任意列: market, theme, usdJpy, beta, fundamentalNote, flags, skipConditions, pattern
  *
- * JPXの全銘柄一覧を整える前に、まず監視したい銘柄だけで実データセットを作るための入口。
+ * JPXの全銘柄一覧を整える前に、まず監視したい銘柄・代表銘柄ユニバースだけで
+ * 実データセットを作るための入口。
  */
 import { resolve } from 'node:path';
 import type { CandidateComments, Sensitivity } from '../../../src/types/dataset';

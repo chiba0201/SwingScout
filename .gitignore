@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+
+# 生データ（CSV/PDFなど）はデプロイ・コミット対象外
+raw-data/
+
+# CLIで生成したレポート
+reports/*
+!reports/.gitkeep

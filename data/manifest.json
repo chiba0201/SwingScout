@@ -1,0 +1,12 @@
+{
+  "default": "mock-candidates.json",
+  "datasets": [
+    {
+      "file": "mock-candidates.json",
+      "asOf": "2026-10-05",
+      "label": "サンプルデータ（架空銘柄）",
+      "isSample": true,
+      "generatedAt": "2026-10-06T07:54:24.460Z"
+    }
+  ]
+}

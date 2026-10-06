@@ -1,0 +1,211 @@
+@import 'tailwindcss';
+
+/*
+ * デザイントークン
+ * - 藍（accent）: UIの操作色・スコアバー
+ * - 山吹（caution）: 警告タグ・リスク
+ * - up / down: 上昇・下落、ポジティブ・ネガティブ専用（それ以外に使わない）
+ *   ※和式（上昇=赤）にしたい場合は --c-up と --c-down を入れ替える
+ */
+:root {
+  color-scheme: light;
+  --c-page: #eef1f5;
+  --c-panel: #ffffff;
+  --c-panel-2: #f6f8fa;
+  --c-rule: #dce1e8;
+  --c-rule-strong: #c5ccd6;
+  --c-ink: #121821;
+  --c-ink-2: #46505f;
+  --c-muted: #6f7a8b;
+  --c-accent: #1e4e7c;
+  --c-accent-strong: #163b5e;
+  --c-accent-soft: #e4ecf5;
+  --c-accent-track: #cfdcea;
+  --c-header: #13263a;
+  --c-header-ink: #e6edf5;
+  --c-header-muted: #9fb2c6;
+  --c-up: #0a7f52;
+  --c-up-soft: #e2f3eb;
+  --c-down: #c2303b;
+  --c-down-soft: #fae6e8;
+  --c-caution: #8a5a00;
+  --c-caution-soft: #fbf0d6;
+  --c-caution-fill: #d59a1e;
+  --c-caution-track: #f3e3bd;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --c-page: #0d1117;
+    --c-panel: #141a22;
+    --c-panel-2: #1a212b;
+    --c-rule: #27303c;
+    --c-rule-strong: #364151;
+    --c-ink: #e5eaf0;
+    --c-ink-2: #a9b3c1;
+    --c-muted: #7f8a9b;
+    --c-accent: #7ba9d9;
+    --c-accent-strong: #a6c6e8;
+    --c-accent-soft: #1b2a3a;
+    --c-accent-track: #243445;
+    --c-header: #0a1622;
+    --c-header-ink: #e5eaf0;
+    --c-header-muted: #8396ab;
+    --c-up: #34c38a;
+    --c-up-soft: #12291f;
+    --c-down: #f0707a;
+    --c-down-soft: #33171b;
+    --c-caution: #e8b64a;
+    --c-caution-soft: #2e2410;
+    --c-caution-fill: #c98f1c;
+    --c-caution-track: #3a2f17;
+  }
+}
+
+@theme inline {
+  --font-sans: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic UI', 'Yu Gothic', Meiryo, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+
+  --color-page: var(--c-page);
+  --color-panel: var(--c-panel);
+  --color-panel-2: var(--c-panel-2);
+  --color-rule: var(--c-rule);
+  --color-rule-strong: var(--c-rule-strong);
+  --color-ink: var(--c-ink);
+  --color-ink-2: var(--c-ink-2);
+  --color-muted: var(--c-muted);
+  --color-accent: var(--c-accent);
+  --color-accent-strong: var(--c-accent-strong);
+  --color-accent-soft: var(--c-accent-soft);
+  --color-accent-track: var(--c-accent-track);
+  --color-header: var(--c-header);
+  --color-header-ink: var(--c-header-ink);
+  --color-header-muted: var(--c-header-muted);
+  --color-up: var(--c-up);
+  --color-up-soft: var(--c-up-soft);
+  --color-down: var(--c-down);
+  --color-down-soft: var(--c-down-soft);
+  --color-caution: var(--c-caution);
+  --color-caution-soft: var(--c-caution-soft);
+  --color-caution-fill: var(--c-caution-fill);
+  --color-caution-track: var(--c-caution-track);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-page font-sans text-ink antialiased;
+    font-size: 14px;
+    line-height: 1.65;
+    font-feature-settings: 'palt' 1;
+  }
+  :focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  ::selection {
+    background: var(--c-accent-soft);
+  }
+}
+
+@layer components {
+  /* 数値列は等幅で桁を揃える */
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .panel {
+    @apply rounded-md border border-rule bg-panel;
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-semibold tracking-[0.08em] text-muted;
+  }
+
+  .btn {
+    @apply inline-flex items-center gap-1.5 rounded border border-rule-strong bg-panel px-3 py-1.5 text-[13px] font-medium text-ink transition-colors hover:bg-panel-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-accent bg-accent text-white hover:bg-accent-strong;
+  }
+
+  .field {
+    @apply rounded border border-rule-strong bg-panel px-2 py-1.5 text-[13px] text-ink;
+  }
+
+  .data-table {
+    @apply w-full border-collapse text-[13px];
+  }
+  .data-table th {
+    @apply border-b border-rule bg-panel-2 px-3 py-2 text-left text-[11px] font-semibold whitespace-nowrap text-muted;
+  }
+  .data-table td {
+    @apply border-b border-rule px-3 py-2.5 align-middle;
+  }
+  .data-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  /* Markdown プレビュー */
+  .md-preview {
+    @apply text-[14px] leading-[1.8] text-ink;
+  }
+  .md-preview h1 {
+    @apply mb-4 border-b-2 border-accent pb-2 text-xl font-bold leading-snug;
+  }
+  .md-preview h2 {
+    @apply mt-8 mb-3 border-l-4 border-accent pl-2.5 text-[16px] font-bold;
+  }
+  .md-preview h3 {
+    @apply mt-6 mb-2 text-[14.5px] font-bold;
+  }
+  .md-preview p {
+    @apply my-2;
+  }
+  .md-preview ul {
+    @apply my-2 list-disc pl-5;
+  }
+  .md-preview ul ul {
+    @apply my-1 list-[circle];
+  }
+  .md-preview li {
+    @apply my-1;
+  }
+  .md-preview blockquote {
+    @apply my-3 border-l-[3px] border-accent bg-accent-soft px-4 py-2 text-ink-2;
+  }
+  .md-preview blockquote p {
+    @apply my-0.5;
+  }
+  .md-preview table {
+    @apply my-3 block w-full overflow-x-auto border-collapse text-[12.5px];
+  }
+  .md-preview th,
+  .md-preview td {
+    @apply border border-rule px-2 py-1 text-left align-top;
+  }
+  .md-preview th {
+    @apply bg-panel-2 whitespace-nowrap;
+  }
+  .md-preview hr {
+    @apply my-6 border-rule;
+  }
+  .md-preview strong {
+    @apply font-bold;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

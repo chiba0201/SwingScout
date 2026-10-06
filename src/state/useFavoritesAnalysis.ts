@@ -15,11 +15,15 @@ export function useFavoritesAnalysis(): {
   analysis: DatasetAnalysis | null;
   reload: () => void;
 } {
-  const { scoring, patternId } = useData();
+  const { scoring, patternId, favoritesOverride } = useData();
   const [load, setLoad] = useState<LoadState>({ status: 'loading' });
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    if (favoritesOverride) {
+      setLoad({ status: 'ready', dataset: favoritesOverride });
+      return;
+    }
     let cancelled = false;
     setLoad({ status: 'loading' });
     loadFavoritesDataset()
@@ -28,7 +32,7 @@ export function useFavoritesAnalysis(): {
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [favoritesOverride, reloadKey]);
 
   const analysis = useMemo(() => {
     if (load.status !== 'ready') return null;

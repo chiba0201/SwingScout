@@ -59,10 +59,14 @@ const selectClass =
   'rounded border border-header-muted/40 bg-header py-1 pr-1 pl-2 text-[12px] text-header-ink hover:border-header-muted';
 
 function Controls({ className }: { className?: string }) {
-  const { manifest, file, selectFile, patternId, setPatternId } = useData();
+  const { manifest, file, selectFile, patternId, setPatternId, datasetOverride } = useData();
   return (
     <div className={cx('flex min-w-0 items-center gap-2', className)}>
-      {manifest && manifest.datasets.length > 0 && (
+      {datasetOverride ? (
+        <span className="rounded border border-accent/50 bg-accent-soft px-2 py-1 text-[12px] font-semibold text-accent">
+          ブラウザ生成データ
+        </span>
+      ) : manifest && manifest.datasets.length > 0 ? (
         <label className="flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none">
           <span className="hidden text-[11px] text-header-muted lg:inline">データ</span>
           <select
@@ -78,7 +82,7 @@ function Controls({ className }: { className?: string }) {
             ))}
           </select>
         </label>
-      )}
+      ) : null}
       <label className="flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none">
         <span className="hidden text-[11px] text-header-muted lg:inline">保有</span>
         <select
@@ -120,7 +124,7 @@ function StatusView() {
 }
 
 export function Layout() {
-  const { analysis } = useData();
+  const { analysis, datasetOverride, setDatasetOverride } = useData();
   const meta = analysis?.dataset.meta;
   const mode = meta ? datasetModeFromSource(meta.source, meta.isSample) : null;
   const { pathname } = useLocation();
@@ -164,6 +168,19 @@ export function Layout() {
             <span className="font-bold text-ink-2">{mode.label}モード</span>
             ：{mode.description}
           </p>
+        </div>
+      )}
+      {datasetOverride && (
+        <div className="border-b border-accent/20 bg-accent-soft">
+          <div className="mx-auto flex max-w-[1280px] items-center gap-3 px-4 py-1.5 text-[12px] text-accent md:px-6">
+            <p className="min-w-0 flex-1">
+              <span className="font-bold">ブラウザ生成データを表示中</span>
+              ：保存ファイルではなく、このブラウザに一時反映したデータです。
+            </p>
+            <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setDatasetOverride(null)}>
+              解除
+            </button>
+          </div>
         </div>
       )}
 

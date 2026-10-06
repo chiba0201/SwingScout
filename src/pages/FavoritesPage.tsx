@@ -1,6 +1,7 @@
 import { CandidateTable } from '../components/CandidateTable';
 import { PageTitle } from '../components/ui';
 import { formatDateJa } from '../lib/calendar';
+import { useData } from '../state/DataContext';
 import { useFavoritesAnalysis } from '../state/useFavoritesAnalysis';
 
 function FavoritesError({ message, hint, reload }: { message: string; hint?: string; reload: () => void }) {
@@ -24,6 +25,7 @@ npm run data:favorites`}</pre>
 
 export function FavoritesPage() {
   const { load, analysis, reload } = useFavoritesAnalysis();
+  const { favoritesOverride, setFavoritesOverride } = useData();
 
   if (load.status === 'loading') {
     return <p className="py-16 text-center text-muted">お気に入りを読み込んでいます…</p>;
@@ -48,6 +50,14 @@ export function FavoritesPage() {
           `raw-data/watchlist.csv` のお気に入り・注目銘柄だけを、現在のスコア配分と保有パターンで再評価しています。
           代表銘柄スクリーニングとは別枠なので、今見ているデータセットを切り替えなくても確認できます。
         </p>
+        {favoritesOverride && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-accent">
+            <span className="font-bold">ブラウザ生成のお気に入りデータを表示中</span>
+            <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setFavoritesOverride(null)}>
+              解除
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="panel overflow-hidden" aria-label="お気に入り一覧">

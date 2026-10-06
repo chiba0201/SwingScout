@@ -19,6 +19,8 @@ const TOP_N = 6;
 const STORAGE_KEY = 'swingscout:prefs:v1';
 const MEMO_KEY = 'swingscout:today-memo:v1';
 const TODAY_OVERRIDE_KEY = 'swingscout:today-override:v1';
+const DATASET_OVERRIDE_KEY = 'swingscout:dataset-override:v1';
+const FAVORITES_OVERRIDE_KEY = 'swingscout:favorites-override:v1';
 
 interface StoredMemo {
   text: string;
@@ -56,6 +58,25 @@ function writeTodayOverride(today: TodayMarket | null): boolean {
   try {
     if (today) localStorage.setItem(TODAY_OVERRIDE_KEY, JSON.stringify(today));
     else localStorage.removeItem(TODAY_OVERRIDE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readDatasetOverride(key: string): Dataset | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) ?? 'null') as Dataset | null;
+    return v && typeof v.asOf === 'string' && Array.isArray(v.candidates) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDatasetOverride(key: string, dataset: Dataset | null): boolean {
+  try {
+    if (dataset) localStorage.setItem(key, JSON.stringify(dataset));
+    else localStorage.removeItem(key);
     return true;
   } catch {
     return false;
@@ -106,6 +127,10 @@ interface DataContextValue {
   resetScoring: () => void;
   isScoringDefault: boolean;
   analysis: DatasetAnalysis | null;
+  datasetOverride: Dataset | null;
+  setDatasetOverride: (dataset: Dataset | null) => boolean;
+  favoritesOverride: Dataset | null;
+  setFavoritesOverride: (dataset: Dataset | null) => boolean;
   reload: () => void;
   todayLoad: TodayLoadState;
   todayOverride: TodayMarket | null;
@@ -134,6 +159,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [todayLoad, setTodayLoad] = useState<TodayLoadState>({ status: 'loading' });
   const [todayOverride, setTodayOverrideState] = useState<TodayMarket | null>(readTodayOverride);
+  const [datasetOverride, setDatasetOverrideState] = useState<Dataset | null>(() => readDatasetOverride(DATASET_OVERRIDE_KEY));
+  const [favoritesOverride, setFavoritesOverrideState] = useState<Dataset | null>(() => readDatasetOverride(FAVORITES_OVERRIDE_KEY));
   const [storedMemo, setStoredMemo] = useState<StoredMemo | null>(readMemo);
 
   useEffect(() => {
@@ -182,14 +209,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
     writePrefs({ file: file ?? undefined, patternId, scoring });
   }, [file, patternId, scoring]);
 
+  const effectiveLoad: LoadState = datasetOverride ? { status: 'ready', dataset: datasetOverride } : load;
+
   const analysis = useMemo(() => {
-    if (load.status !== 'ready') return null;
-    return analyzeDataset(load.dataset, {
+    if (effectiveLoad.status !== 'ready') return null;
+    return analyzeDataset(effectiveLoad.dataset, {
       scoring,
       pattern: findHoldingPattern(patternId),
       topN: TOP_N,
     });
-  }, [load, scoring, patternId]);
+  }, [effectiveLoad, scoring, patternId]);
 
   const todayData = todayOverride ?? (todayLoad.status === 'ready' ? todayLoad.data : null);
   const memo = useMemo(() => {
@@ -214,14 +243,29 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return writeTodayOverride(today);
   }, []);
 
+  const setDatasetOverride = useCallback((dataset: Dataset | null) => {
+    setDatasetOverrideState(dataset);
+    return writeDatasetOverride(DATASET_OVERRIDE_KEY, dataset);
+  }, []);
+
+  const setFavoritesOverride = useCallback((dataset: Dataset | null) => {
+    setFavoritesOverrideState(dataset);
+    return writeDatasetOverride(FAVORITES_OVERRIDE_KEY, dataset);
+  }, []);
+
+  const selectFile = useCallback((nextFile: string) => {
+    setDatasetOverride(null);
+    setFile(nextFile);
+  }, [setDatasetOverride]);
+
   const resetScoring = useCallback(() => setScoring(DEFAULT_SCORING_CONFIG), []);
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
 
   const value: DataContextValue = {
-    load,
+    load: effectiveLoad,
     manifest,
     file,
-    selectFile: setFile,
+    selectFile,
     patternId,
     setPatternId,
     scoring,
@@ -229,6 +273,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     resetScoring,
     isScoringDefault: JSON.stringify(scoring) === JSON.stringify(DEFAULT_SCORING_CONFIG),
     analysis,
+    datasetOverride,
+    setDatasetOverride,
+    favoritesOverride,
+    setFavoritesOverride,
     reload,
     todayLoad,
     todayOverride,

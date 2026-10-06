@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { PageTitle, Panel } from '../components/ui';
 import { buildDatasetInBrowser, type BrowserDatasetResult } from '../lib/browserDatasetBuilder';
 import { formatDateJa } from '../lib/calendar';
@@ -56,7 +57,8 @@ function statText(result: BrowserDatasetResult | null) {
 }
 
 export function DataUpdatePage() {
-  const { todayAnalysis, analysis, patternId } = useData();
+  const { todayAnalysis, analysis, patternId, datasetOverride, favoritesOverride, setDatasetOverride, setFavoritesOverride } = useData();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<'universe' | 'favorites'>('universe');
   const [asOf, setAsOf] = useState(analysis?.dataset.asOf ?? jstToday());
   const [universeCsv, setUniverseCsv] = useState(defaultUniverse);
@@ -106,6 +108,17 @@ export function DataUpdatePage() {
     }
   };
 
+  const openInBrowser = () => {
+    if (!result) return;
+    if (mode === 'favorites') {
+      setFavoritesOverride(result.dataset);
+      navigate('/favorites');
+    } else {
+      setDatasetOverride(result.dataset);
+      navigate('/');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <PageTitle title="データ更新">
@@ -117,6 +130,11 @@ export function DataUpdatePage() {
           ターミナルの `data:universe` / `data:favorites` 相当を画面で行うための作業台です。
           日足CSVだけは外部から用意して、`6857.csv` のように銘柄コード名で複数選択してください。
         </p>
+        {(datasetOverride || favoritesOverride) && (
+          <p className="mt-2 text-[12px] text-caution">
+            このブラウザでは生成データを一時反映中です。公開用にする場合はJSONを保存して `data/` へ置いてください。
+          </p>
+        )}
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -203,6 +221,9 @@ export function DataUpdatePage() {
               <button type="button" className="btn w-full justify-center" disabled={!result} onClick={() => result && downloadJson(outputFile, result.dataset)}>
                 {outputFile} を保存
               </button>
+              <button type="button" className="btn w-full justify-center" disabled={!result} onClick={openInBrowser}>
+                このブラウザで開く
+              </button>
               {mode === 'universe' && result && (
                 <button
                   type="button"
@@ -223,6 +244,18 @@ export function DataUpdatePage() {
                   }
                 >
                   manifest用メモを保存
+                </button>
+              )}
+              {(datasetOverride || favoritesOverride) && (
+                <button
+                  type="button"
+                  className="btn w-full justify-center"
+                  onClick={() => {
+                    if (mode === 'favorites') setFavoritesOverride(null);
+                    else setDatasetOverride(null);
+                  }}
+                >
+                  一時反映を解除
                 </button>
               )}
             </div>

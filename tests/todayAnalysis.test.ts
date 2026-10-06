@@ -85,9 +85,11 @@ describe('analyzeToday', () => {
     expect(t.watchlist.some((w) => w.action === 'chase-ok')).toBe(false);
   });
 
-  it('日経VIは Today に無ければスイング側の前日終値を使う', () => {
-    expect(t.vi).toMatchObject({ value: 22.84, source: 'swing', regime: { label: 'やや警戒' } });
+  it('Today に日経VIが無ければVIX、VIXも無ければスイング側の前日終値を使う', () => {
+    expect(t.vi).toMatchObject({ value: 17.2, label: 'VIX', source: 'today', regime: { label: '落ち着き' } });
     expect(analyzeToday(calm, swing).vi).toMatchObject({ value: 16, source: 'today', regime: { label: '落ち着き' } });
+    const noTodayVol = { ...today, externalQuotes: today.externalQuotes.filter((q) => q.id !== 'vix' && q.id !== 'nikkeiVI') };
+    expect(analyzeToday(noTodayVol, swing).vi).toMatchObject({ value: 22.84, label: '日経VI', source: 'swing' });
   });
 
   it('スイングの保有ウィンドウでの位置づけ', () => {
@@ -105,6 +107,7 @@ describe('analyzeToday', () => {
 
   it('Today の日付がスイング基準日以前なら注意を出す', () => {
     expect(t.notices).toHaveLength(0);
-    expect(analyzeToday({ ...today, asOf: swing.dataset.asOf }, swing).notices[0]).toMatch(/基準日/);
+    expect(analyzeToday({ ...today, asOf: swing.dataset.asOf }, swing).notices).toHaveLength(0);
+    expect(analyzeToday({ ...today, asOf: '2026-10-04' }, swing).notices[0]).toMatch(/基準日/);
   });
 });

@@ -85,12 +85,13 @@ export function Change({
   polarity?: QuotePolarity;
   className?: string;
 }) {
-  const label = value > 0 ? '上昇' : value < 0 ? '下落' : '変わらず';
+  const trend = value !== 0 ? value : (pct ?? 0);
+  const label = trend > 0 ? '上昇' : trend < 0 ? '下落' : '変わらず';
   return (
-    <span className={cx('num whitespace-nowrap', directionClass(value, polarity), className)}>
+    <span className={cx('num whitespace-nowrap', directionClass(trend, polarity), className)}>
       <span className="sr-only">{label}</span>
-      <Arrow value={value} /> {formatSigned(value, digits)}
-      {pct !== undefined && <span className="ml-1">({formatPct(pct, 2)})</span>}
+      <Arrow value={trend} /> {value === 0 && pct !== undefined ? formatPct(pct, 2) : formatSigned(value, digits)}
+      {value !== 0 && pct !== undefined && <span className="ml-1">({formatPct(pct, 2)})</span>}
     </span>
   );
 }

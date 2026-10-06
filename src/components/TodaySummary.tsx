@@ -87,7 +87,7 @@ export function TodaySummary({ analysis: t }: { analysis: TodayAnalysis }) {
           {d.positionSize.label}
         </KeyFact>
         <KeyFact
-          label="日経VI"
+          label={t.vi?.label ?? '日経VI'}
           sub={t.vi ? `${t.vi.regime.label}・${t.vi.source === 'today' ? '当日' : '前日終値（スイングデータ）'}` : undefined}
         >
           {t.vi ? <span className="num">{t.vi.value.toFixed(2)}</span> : '—'}

@@ -18,7 +18,12 @@ const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
 function quoteRow(q: Quote): string {
   const digits = q.decimals ?? inferDecimals(q.value);
-  const change = q.unit === '%' ? formatSigned(q.change, 2) : `${formatSigned(q.change, Math.max(digits, 1))}（${formatPct(q.changePct, 2)}）`;
+  const change =
+    q.change === 0 && q.changePct !== 0
+      ? formatPct(q.changePct, 2)
+      : q.unit === '%'
+        ? formatSigned(q.change, 2)
+        : `${formatSigned(q.change, Math.max(digits, 1))}（${formatPct(q.changePct, 2)}）`;
   return `| ${cell(q.label)} | ${formatNumber(q.value, digits)}${q.unit ?? ''} | ${change} |`;
 }
 
@@ -35,7 +40,7 @@ function renderStructured(t: TodayAnalysis, h: string): string[] {
     `- サイズ目安: ${d.positionSize.label}${d.positionSize.reason ? ` — ${d.positionSize.reason}` : ''}`,
     `- スイング: ${t.swingRole.label}`,
   ];
-  if (t.vi) lines.push(`- 日経VI: ${t.vi.value.toFixed(2)}（${t.vi.source === 'today' ? '当日' : '前日終値'}）`);
+  if (t.vi) lines.push(`- ${t.vi.label}: ${t.vi.value.toFixed(2)}（${t.vi.source === 'today' ? '当日' : '前日終値'}）`);
   for (const n of t.notices) lines.push(`- 注意: ${n}`);
 
   if (d.externalQuotes.length > 0) {

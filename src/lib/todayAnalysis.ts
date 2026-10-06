@@ -51,7 +51,7 @@ export type SwingDayRole = 'entry' | 'hold' | 'exit' | 'outside';
 export interface TodayAnalysis {
   today: TodayMarket;
   /** 判定に使った日経VI（Today に無ければスイング側の前日終値）と、その水準の区分 */
-  vi: { value: number; source: 'today' | 'swing'; regime: ViRegime } | null;
+  vi: { value: number; label: string; source: 'today' | 'swing'; regime: ViRegime } | null;
   /** 想定ギャップに最も近いシナリオの id */
   likelyScenarioId: OpenScenario['id'] | null;
   /** 時刻順。SQ・休場・上位候補の決算を自動で追加済み */
@@ -185,15 +185,19 @@ export function analyzeToday(
   swing: DatasetAnalysis,
   memo: ParsedMarketMemo | null = null,
 ): TodayAnalysis {
-  const own = today.externalQuotes.find((q: Quote) => q.id === 'nikkeiVI');
+  const own = today.externalQuotes.find((q: Quote) => q.id === 'nikkeiVI') ?? today.externalQuotes.find((q: Quote) => q.id === 'vix');
   const swingVi = findQuote(swing.dataset.marketContext, 'nikkeiVI');
-  const viSource = own ? { value: own.value, source: 'today' as const } : swingVi ? { value: swingVi.value, source: 'swing' as const } : null;
+  const viSource = own
+    ? { value: own.value, label: own.label, source: 'today' as const }
+    : swingVi
+      ? { value: swingVi.value, label: swingVi.label, source: 'swing' as const }
+      : null;
   const vi = viSource ? { ...viSource, regime: viRegime(viSource.value) } : null;
 
   const notices: string[] = [];
-  if (toTime(today.asOf) <= toTime(swing.dataset.asOf)) {
+  if (toTime(today.asOf) < toTime(swing.dataset.asOf)) {
     notices.push(
-      `Todayデータの日付（${formatDateJa(today.asOf)}）がスイング候補の基準日（${formatDateJa(swing.dataset.asOf)}）以前です。today-market.json が更新されているか確認してください。`,
+      `Todayデータの日付（${formatDateJa(today.asOf)}）がスイング候補の基準日（${formatDateJa(swing.dataset.asOf)}）より前です。today-market.json が更新されているか確認してください。`,
     );
   }
   if (!isBusinessDay(today.asOf)) notices.push(`${formatDateJa(today.asOf)}は休場日です。`);

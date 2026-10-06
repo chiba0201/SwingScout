@@ -121,7 +121,10 @@ function extractEvents(raw: string): TodayEvent[] {
   for (const line of raw.split(/\r?\n/)) {
     const m = strip(line).match(eventPattern);
     if (!m) continue;
-    const label = m[0].replace(/^[-*・\s]+/, '').trim();
+    const label = m[0]
+      .replace(/^[-*・\s]+/, '')
+      .replace(/^\d{1,2}:\d{2}\s*/, '')
+      .trim();
     if (/決算予定銘柄|ポジション調整|注意$/.test(label) && !m[1] && !/SQ/.test(label)) continue;
     if (out.some((e) => e.label === label)) continue;
     const category: MarketEventCategory = /米|CPI|雇用|FOMC|JOLTS|ISM/.test(label)

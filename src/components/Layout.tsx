@@ -12,6 +12,7 @@ const NAV = [
   { to: '/today', label: 'Today', end: false },
   { to: '/candidates', label: '候補一覧', end: false },
   { to: '/favorites', label: 'お気に入り', end: false },
+  { to: '/data-update', label: 'データ更新', end: false },
   { to: '/report', label: 'レポート', end: false },
 ];
 

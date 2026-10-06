@@ -2,6 +2,7 @@ import { HashRouter, Route, Routes } from 'react-router';
 import { Layout } from './components/Layout';
 import { CandidateDetailPage } from './pages/CandidateDetailPage';
 import { CandidatesPage } from './pages/CandidatesPage';
+import { DataUpdatePage } from './pages/DataUpdatePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { FavoriteDetailPage } from './pages/FavoriteDetailPage';
@@ -26,6 +27,7 @@ export function App() {
             <Route path="candidates/:code" element={<CandidateDetailPage />} />
             <Route path="favorites" element={<FavoritesPage />} />
             <Route path="favorites/:code" element={<FavoriteDetailPage />} />
+            <Route path="data-update" element={<DataUpdatePage />} />
             <Route path="report" element={<ReportPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

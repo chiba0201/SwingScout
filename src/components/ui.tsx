@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { WarningTag } from '../lib/warnings';
 import { formatNumber, formatPct, formatScore, formatSigned } from '../lib/format';
 import { STANCE_LABELS } from '../lib/market';
+import type { DatasetModeInfo } from '../lib/datasetMode';
 import type { MarketStance, QuotePolarity } from '../types/dataset';
 
 const cx = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(' ');
@@ -204,6 +205,28 @@ export function SampleBadge() {
   return (
     <span className="rounded-sm border border-caution/50 bg-caution-soft px-1.5 py-px text-[10.5px] font-bold tracking-wider text-caution">
       SAMPLE
+    </span>
+  );
+}
+
+const DATASET_MODE_CLASS: Record<DatasetModeInfo['mode'], string> = {
+  sample: 'border-caution/50 bg-caution-soft text-caution',
+  universe: 'border-accent/45 bg-accent-soft text-accent',
+  watchlist: 'border-caution/45 bg-caution-soft text-caution',
+  local: 'border-rule-strong bg-panel-2 text-ink-2',
+  unknown: 'border-rule-strong bg-panel-2 text-ink-2',
+};
+
+export function DatasetModeBadge({ info }: { info: DatasetModeInfo }) {
+  return (
+    <span
+      className={cx(
+        'rounded-sm border px-1.5 py-px text-[10.5px] font-bold tracking-wider whitespace-nowrap',
+        DATASET_MODE_CLASS[info.mode],
+      )}
+      title={info.description}
+    >
+      {info.shortLabel}
     </span>
   );
 }

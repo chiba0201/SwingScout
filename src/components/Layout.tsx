@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { formatDateJa, HOLDING_PATTERNS } from '../lib/calendar';
+import { datasetModeFromSource, datasetOptionLabel } from '../lib/datasetMode';
 import { formatDateTime } from '../lib/format';
 import { DISCLAIMER } from '../lib/reportGenerator';
 import { useData } from '../state/DataContext';
-import { cx, SampleBadge } from './ui';
+import { cx, DatasetModeBadge, SampleBadge } from './ui';
 
 const NAV = [
   { to: '/', label: 'ダッシュボード', end: true },
@@ -70,7 +71,7 @@ function Controls({ className }: { className?: string }) {
           >
             {manifest.datasets.map((d) => (
               <option key={d.file} value={d.file}>
-                {formatDateJa(d.asOf)} {d.isSample ? 'サンプル' : d.label}
+                {formatDateJa(d.asOf)} {datasetOptionLabel(d)}
               </option>
             ))}
           </select>
@@ -119,6 +120,7 @@ function StatusView() {
 export function Layout() {
   const { analysis } = useData();
   const meta = analysis?.dataset.meta;
+  const mode = meta ? datasetModeFromSource(meta.source, meta.isSample) : null;
   const { pathname } = useLocation();
 
   // ハッシュルーティングでは画面遷移でスクロール位置が残るため、先頭に戻す
@@ -136,6 +138,7 @@ export function Layout() {
           <NavTabs className="hidden self-end md:block" />
           <div className="ml-auto flex items-center gap-2">
             {meta?.isSample && <SampleBadge />}
+            {mode && !meta?.isSample && <DatasetModeBadge info={mode} />}
             <Controls className="hidden sm:flex" />
           </div>
         </div>
@@ -150,6 +153,14 @@ export function Layout() {
           <p className="mx-auto max-w-[1280px] px-4 py-1.5 text-[12px] text-caution md:px-6">
             <span className="font-bold">サンプルデータを表示中</span>
             ：銘柄・価格・需給・日程・コメントはすべて架空です。実在銘柄の推奨ではありません。
+          </p>
+        </div>
+      )}
+      {mode && !meta?.isSample && (
+        <div className="border-b border-rule bg-panel">
+          <p className="mx-auto max-w-[1280px] px-4 py-1.5 text-[12px] text-muted md:px-6">
+            <span className="font-bold text-ink-2">{mode.label}モード</span>
+            ：{mode.description}
           </p>
         </div>
       )}

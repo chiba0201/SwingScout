@@ -4,9 +4,11 @@
  * 外部通信・AI API は使わず、行単位の正規表現だけで「拾える範囲」を拾う。
  * 抽出できなくても原文（raw）は必ず保持し、画面やレポートでは原文も確認できるようにする。
  *
- *   headline     … 冒頭の太字文、なければ最初の本文
- *   sections     … ## / ### / #### 見出しごとの本文
- *   tables       … Markdown テーブル
+ *   headline     … 冒頭の太字文、なければ最初の本文（「対象：」「情報確認：」のような日付・時刻の行は飛ばす）
+ *   sections     … ## / ### / #### 見出し、または【見出し】ごとの本文
+ *   tables       … Markdown テーブル、またはタブ区切りの表（ChatGPT の画面からコピーした表）
+ *
+ * 末尾の「SwingScout用まとめ」（memoBrief.ts）は決まった形で別に読むので、ここでは本文から外して扱う。
  *   sources      … Markdown リンク（と裸の URL）
  *   needsReview  … 「未確認」「確認が必要」「取得できない」などの語があれば true
  */
@@ -43,6 +45,8 @@ export interface ReviewHit {
   line: string;
 }
 
+import { splitMemoBrief } from './memoBrief';
+
 export interface ParsedMarketMemo {
   raw: string;
   /** 'pasted': 画面で貼り付け（ブラウザ保存） / 'json': today-market.json の memoMarkdown */
@@ -67,6 +71,12 @@ export const REVIEW_PATTERN =
   /未確認|要確認|確認が必要|確認(?:でき|出来)(?:な|ず|ませ|てい(?:な|ませ))|取得(?:でき|出来)(?:な|ず|ませ|てい(?:な|ませ))|未取得|不明|データなし|情報なし/;
 
 const HEADING = /^(#{1,6})\s+(.+?)\s*#*\s*$/;
+/** 【本日の注目】のような角かっこの見出し（その行だけのもの） */
+const BRACKET_HEADING = /^\s*【([^】]{1,30})】\s*$/;
+/** タブ区切りの表の行（セルが2つ以上） */
+const TSV_ROW = (line: string) => line.includes('\t') && line.split('\t').filter((c) => c.trim()).length >= 2;
+/** 本文の見出しにしない、日付・確認時刻だけの行 */
+const META_LINE = /^\s*(?:対象|対象日|日付|作成|作成日時|更新|情報確認|確認時刻)\s*[:：]/;
 const FENCE = /^\s*(```|~~~)/;
 const HR = /^\s*([-*_])(\s*\1){2,}\s*$/;
 const TABLE_ROW = /^\s*\|.*\|\s*$/;
@@ -98,6 +108,14 @@ function splitRow(line: string): string[] {
 }
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+/** タブ区切りの行を Markdown の表にする（レポート・画面の表示用） */
+function tsvToMarkdown(rows: string[][]): string[] {
+  const width = Math.max(...rows.map((r) => r.length));
+  const pad = (r: string[]) => [...r, ...Array<string>(width - r.length).fill('')];
+  const line = (r: string[]) => `| ${pad(r).map((c) => c.replace(/\|/g, '\\|')).join(' | ')} |`;
+  return [line(rows[0]!), `|${' --- |'.repeat(width)}`, ...rows.slice(1).map(line)];
+}
 
 function firstSentences(text: string, count: number, max: number): string {
   const parts = text.match(/[^。！？!?]+[。！？!?]?/g) ?? [];
@@ -134,7 +152,7 @@ export function parseMarketMemo(
   origin: { source: ParsedMarketMemo['source']; savedAt?: string } = { source: 'pasted' },
 ): ParsedMarketMemo {
   const text = raw.replace(/\r\n?/g, '\n');
-  const lines = text.split('\n');
+  const lines = splitMemoBrief(text).body.split('\n');
 
   let title: string | null = null;
   const sections: MemoSection[] = [];
@@ -170,6 +188,13 @@ export function parseMarketMemo(
     const line = lines[i]!;
     if (FENCE.test(line)) inFence = !inFence;
 
+    const bracket = !inFence ? line.match(BRACKET_HEADING) : null;
+    if (bracket) {
+      flush();
+      current = { heading: stripInline(bracket[1]!), level: 2, lines: [] };
+      continue;
+    }
+
     const heading = !inFence ? line.match(HEADING) : null;
     if (heading) {
       const level = heading[1]!.length;
@@ -199,19 +224,33 @@ export function parseMarketMemo(
       continue;
     }
 
+    // タブ区切りの表：2行以上続いたら表として扱い、Markdown の表に直して本文に入れる
+    if (!inFence && TSV_ROW(line) && TSV_ROW(lines[i + 1] ?? '')) {
+      let j = i;
+      const rows: string[][] = [];
+      while (j < lines.length && TSV_ROW(lines[j]!)) rows.push(lines[j++]!.split('\t').map((c) => stripInline(c)));
+      const md = tsvToMarkdown(rows);
+      tables.push({ section: current?.heading ?? null, headers: rows[0]!, rows: rows.slice(1), markdown: md.join('\n') });
+      (current?.lines ?? preamble).push(...md);
+      i = j - 1;
+      continue;
+    }
+
     (current?.lines ?? preamble).push(line);
     if (!inFence && line.trim() && !HR.test(line) && !FENCE.test(line)) contentLines.push(line);
   }
   flush();
 
-  // headline：冒頭6行以内の太字文 → なければ最初の本文
+  // headline：冒頭6行以内の太字文 → なければ最初の本文（日付・確認時刻の行は飛ばす。長ければ最初の1文）
+  const bodyLines = contentLines.filter((l) => !META_LINE.test(stripInline(l)));
   let headline: string | null = null;
-  for (const line of contentLines.slice(0, 6)) {
+  for (const line of bodyLines.slice(0, 6)) {
     headline = headlineFromLine(line);
     if (headline) break;
   }
-  if (!headline && contentLines[0]) {
-    headline = clip(stripInline(contentLines[0].replace(QUOTE, '').replace(LIST_ITEM, '$1')), 140) || null;
+  if (!headline && bodyLines[0]) {
+    const first = stripInline(bodyLines[0].replace(QUOTE, '').replace(LIST_ITEM, '$1'));
+    headline = (first.length > 80 ? firstSentences(first, 1, 140) : clip(first, 140)) || null;
   }
 
   // 要確認の語

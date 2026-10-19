@@ -20,8 +20,26 @@ export interface Dataset {
   /** データ基準日（通常は前営業日の引け） */
   asOf: ISODate;
   marketContext: MarketContext;
-  /** スクリーニング通過銘柄（スコア順）。UI では上位N件を「今週の候補」として扱う */
+  /** 採点した銘柄（スコア順）。UI では上位N件を「今週の候補」として扱う */
   candidates: Candidate[];
+  /**
+   * 銘柄リスト全体（採点できなかった銘柄も含む）。候補一覧の「全銘柄」とお気に入りの引き継ぎに使う。
+   * 古いデータには無いことがある。
+   */
+  universe?: UniverseRow[];
+}
+
+/** 銘柄リストの1行の状態。scored：採点済み / no-prices：日足なし / filtered：売買代金・株価の条件外 */
+export type UniverseStatus = 'scored' | 'no-prices' | 'filtered';
+
+export interface UniverseRow {
+  code: string;
+  name: string;
+  sector: string;
+  market?: string;
+  theme?: string;
+  favorite: boolean;
+  status: UniverseStatus;
 }
 
 export interface DatasetMeta {
@@ -76,6 +94,10 @@ export interface Quote {
   unit?: string;
   decimals?: number;
   polarity?: QuotePolarity;
+  /** 前日比が分からない（値だけ確認できた）。true なら前日比を表示しない */
+  changeUnknown?: boolean;
+  /** 値の時点などの補足（例：'4:28時点'、'CME'） */
+  note?: string;
 }
 
 export type MarketEventCategory =
@@ -122,6 +144,23 @@ export interface MarketContext {
   sectors: SectorMove[];
   /** 地合い面の注意点 */
   riskNotes: string[];
+  /**
+   * 地合いの出どころ。Today の市況メモから作ったときだけ入る（src/lib/marketContextFromToday.ts）。
+   * 候補の基準日（日足の最後の日＝前日の引け）と、地合いの時点（今朝のメモ）は別なので、表示で区別する。
+   */
+  source?: MarketContextSource;
+}
+
+export interface MarketContextSource {
+  kind: 'today';
+  /** Today の対象日 */
+  asOf: ISODate;
+  /** '寄り前' '前場' など */
+  session: string;
+  /** メモの情報確認時刻（'HH:MM'） */
+  checkedAt?: string;
+  /** Today に反映した日時（ISO）。いまの Today と比べて、その後に更新されたかを見る */
+  reflectedAt: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -138,6 +177,8 @@ export interface Candidate {
   sector: string;
   /** 相関リスク判定に使うテーマ（例: 半導体、防衛、インバウンド） */
   theme: string;
+  /** お気に入り（銘柄リストの favorite 列） */
+  favorite?: boolean;
   scores: ScoreSummary;
   price: PriceSnapshot;
   volume: VolumeSnapshot;
@@ -270,6 +311,8 @@ export interface EntryPlan {
   zoneHigh?: number;
   /** ギャップアップ時の対応 */
   gapUpRule?: string;
+  /** ギャップダウン時の対応（古いデータには無い。表示時に src/lib/tradePlan.ts の gapDownRuleFor で補う） */
+  gapDownRule?: string;
 }
 
 export interface StopLoss {

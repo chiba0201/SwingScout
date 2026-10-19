@@ -1,6 +1,7 @@
 /**
  * アプリ全体のデータ状態。
  * - スイング：manifest → データセット読み込み → analyzeDataset（重み・保有パターンを反映）
+ * - 銘柄リスト：スクリーニングの母集団（CSV）。お気に入りは favorite 列。候補一覧とデータ更新で共有する
  * - Today：today-market.json ＋ 市況メモ（貼り付け or JSON同梱）→ analyzeToday
  * 画面側は useData() で結果を受け取るだけにして、計算ロジックを持たせない。
  * Today の読み込み失敗はスイング側の画面に影響させない（Today 画面などで個別に表示）。
@@ -12,6 +13,16 @@ import { DataLoadError, loadDataset, loadManifest, loadTodayMarket } from '../li
 import { parseMarketMemo, type ParsedMarketMemo } from '../lib/marketMemo';
 import { DEFAULT_SCORING_CONFIG, type ScoringConfig } from '../lib/scoring';
 import { analyzeToday, type TodayAnalysis } from '../lib/todayAnalysis';
+import {
+  carryOverFavorites,
+  DEFAULT_UNIVERSE_CSV,
+  favoriteCodes as readFavoriteCodes,
+  LEGACY_DEFAULT_UNIVERSE_CSV,
+  readUniverseEntries,
+  setFavorite,
+  universeCsvFromDataset,
+} from '../lib/universeCsv';
+import { readWorkSet } from './workSet';
 import type { DataManifest, Dataset } from '../types/dataset';
 import type { TodayMarket } from '../types/today';
 
@@ -20,7 +31,60 @@ const STORAGE_KEY = 'swingscout:prefs:v1';
 const MEMO_KEY = 'swingscout:today-memo:v1';
 const TODAY_OVERRIDE_KEY = 'swingscout:today-override:v1';
 const DATASET_OVERRIDE_KEY = 'swingscout:dataset-override:v1';
-const FAVORITES_OVERRIDE_KEY = 'swingscout:favorites-override:v1';
+/** 以前の「お気に入り監視」の一時反映。廃止したので起動時に消す */
+const LEGACY_FAVORITES_OVERRIDE_KEY = 'swingscout:favorites-override:v1';
+const UNIVERSE_KEY = 'swingscout:universe:v1';
+
+interface StoredUniverse {
+  csv: string;
+  updatedAt: string;
+}
+
+function readUniverse(): StoredUniverse | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(UNIVERSE_KEY) ?? 'null') as StoredUniverse | null;
+    return v && typeof v.csv === 'string' && v.csv.trim() ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeUniverse(v: StoredUniverse): boolean {
+  try {
+    localStorage.setItem(UNIVERSE_KEY, JSON.stringify(v));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 以前のお気に入り（data/favorites.json の3銘柄） */
+const LEGACY_FAVORITE_CODES = ['6857', '8035', '8306'];
+
+/**
+ * 以前のデータ更新画面で編集していた銘柄リストを引き継ぐ（初期値のままなら null）。
+ * お気に入りは「お気に入り監視」で作っていた内容から favorite 列に移す。
+ */
+function migrateLegacyUniverse(): StoredUniverse | null {
+  const legacy = readWorkSet();
+  const csv = legacy?.universeCsv;
+  if (!csv?.trim() || csv.trim() === LEGACY_DEFAULT_UNIVERSE_CSV.trim()) return null;
+  const favorites =
+    legacy?.mode === 'favorites'
+      ? readUniverseEntries(csv).map((e) => e.code) // お気に入り監視のリストだった
+      : (readDatasetOverride(LEGACY_FAVORITES_OVERRIDE_KEY)?.candidates.map((c) => c.code) ?? LEGACY_FAVORITE_CODES);
+  const migrated = { csv: carryOverFavorites(csv, new Set(favorites)), updatedAt: new Date().toISOString() };
+  writeUniverse(migrated);
+  return migrated;
+}
+
+function removeLegacyFavoritesOverride() {
+  try {
+    localStorage.removeItem(LEGACY_FAVORITES_OVERRIDE_KEY);
+  } catch {
+    /* 消せなくても読まないので問題ない */
+  }
+}
 
 interface StoredMemo {
   text: string;
@@ -83,8 +147,19 @@ function writeDatasetOverride(key: string, dataset: Dataset | null): boolean {
   }
 }
 
+/**
+ * 画面上部の帯（データ選択）で選んだデータセット。defaultAt は選んだときの manifest の既定。
+ * 既定が変わった（新しいデータを公開した）ら選択を捨てて新しい既定を開く。
+ */
+interface DatasetSelection {
+  file: string;
+  defaultAt: string;
+}
+
 interface Prefs {
+  /** 以前の形式。開いたデータを選択の有無に関係なく保存していたので読まない */
   file?: string;
+  selection?: DatasetSelection;
   patternId?: string;
   scoring?: ScoringConfig;
 }
@@ -129,8 +204,16 @@ interface DataContextValue {
   analysis: DatasetAnalysis | null;
   datasetOverride: Dataset | null;
   setDatasetOverride: (dataset: Dataset | null) => boolean;
-  favoritesOverride: Dataset | null;
-  setFavoritesOverride: (dataset: Dataset | null) => boolean;
+  /** 銘柄リスト（CSV）。この端末でまだ入稿していなければ、表示中のデータから作った初期値 */
+  universeCsv: string;
+  /** 銘柄リストを最後に入稿・変更した日時（初期値のままなら null） */
+  universeUpdatedAt: string | null;
+  /** 銘柄リストを入稿（置き換え）。保存できなかった場合は false */
+  setUniverseCsv: (csv: string) => boolean;
+  /** お気に入りの銘柄コード（銘柄リストの favorite 列） */
+  favorites: Set<string>;
+  /** お気に入りを付け外しする（銘柄リストの favorite 列を書き換える） */
+  toggleFavorite: (code: string, on?: boolean) => void;
   reload: () => void;
   todayLoad: TodayLoadState;
   todayOverride: TodayMarket | null;
@@ -153,6 +236,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [prefs] = useState(readPrefs);
   const [manifest, setManifest] = useState<DataManifest | null>(null);
   const [file, setFile] = useState<string | null>(null);
+  // ユーザーが選んだときだけ持つ。選んでいなければ manifest の既定（最新のデータ）を開く
+  const [selection, setSelection] = useState<DatasetSelection | null>(prefs.selection ?? null);
   const [load, setLoad] = useState<LoadState>({ status: 'loading' });
   const [patternId, setPatternId] = useState(prefs.patternId ?? 'tue-fri');
   const [scoring, setScoring] = useState<ScoringConfig>(prefs.scoring ?? DEFAULT_SCORING_CONFIG);
@@ -160,8 +245,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [todayLoad, setTodayLoad] = useState<TodayLoadState>({ status: 'loading' });
   const [todayOverride, setTodayOverrideState] = useState<TodayMarket | null>(readTodayOverride);
   const [datasetOverride, setDatasetOverrideState] = useState<Dataset | null>(() => readDatasetOverride(DATASET_OVERRIDE_KEY));
-  const [favoritesOverride, setFavoritesOverrideState] = useState<Dataset | null>(() => readDatasetOverride(FAVORITES_OVERRIDE_KEY));
+  const [storedUniverse, setStoredUniverse] = useState<StoredUniverse | null>(() => readUniverse() ?? migrateLegacyUniverse());
+  useEffect(removeLegacyFavoritesOverride, []);
   const [storedMemo, setStoredMemo] = useState<StoredMemo | null>(readMemo);
+
+  // 別のタブ・ウィンドウで変えたブラウザ保存の内容を、このタブにも反映する
+  // （データ更新で候補を生成したとき、別ウィンドウの候補一覧も切り替わるように）
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.storageArea !== localStorage) return;
+      const all = e.key === null; // localStorage.clear()
+      if (all || e.key === DATASET_OVERRIDE_KEY) setDatasetOverrideState(readDatasetOverride(DATASET_OVERRIDE_KEY));
+      if (all || e.key === UNIVERSE_KEY) setStoredUniverse(readUniverse());
+      if (all || e.key === TODAY_OVERRIDE_KEY) setTodayOverrideState(readTodayOverride());
+      if (all || e.key === MEMO_KEY) setStoredMemo(readMemo());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,7 +275,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
   }, [reloadKey]);
 
-  // manifest を読み、保存済みの選択がまだ存在すればそれを、無ければ既定を開く
+  // manifest を読み、選んだデータがまだ有効（存在し、その後に既定が変わっていない）ならそれを、無ければ既定を開く
   useEffect(() => {
     let cancelled = false;
     setLoad({ status: 'loading' });
@@ -182,8 +283,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       .then((m) => {
         if (cancelled) return;
         setManifest(m);
+        // 選んだあとに既定が変わっていたら、選択は捨てる（保存からも消す）
+        setSelection((sel) => (sel && sel.defaultAt !== m.default ? null : sel));
         setFile((current) => {
-          const wanted = current ?? prefs.file;
+          const chosen = prefs.selection?.defaultAt === m.default ? prefs.selection.file : null;
+          const wanted = current ?? chosen;
           return wanted && m.datasets.some((d) => d.file === wanted) ? wanted : m.default;
         });
       })
@@ -191,7 +295,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [prefs.file, reloadKey]);
+  }, [prefs.selection, reloadKey]);
 
   useEffect(() => {
     if (!file) return;
@@ -206,8 +310,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [file, reloadKey]);
 
   useEffect(() => {
-    writePrefs({ file: file ?? undefined, patternId, scoring });
-  }, [file, patternId, scoring]);
+    writePrefs({ selection: selection ?? undefined, patternId, scoring });
+  }, [selection, patternId, scoring]);
 
   const effectiveLoad: LoadState = datasetOverride ? { status: 'ready', dataset: datasetOverride } : load;
 
@@ -248,15 +352,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return writeDatasetOverride(DATASET_OVERRIDE_KEY, dataset);
   }, []);
 
-  const setFavoritesOverride = useCallback((dataset: Dataset | null) => {
-    setFavoritesOverrideState(dataset);
-    return writeDatasetOverride(FAVORITES_OVERRIDE_KEY, dataset);
+  // 銘柄リスト：この端末で入稿・変更済みならそれ。無ければ表示中の実データ → 初期値（以前のお気に入り3銘柄）
+  const datasetForSeed = effectiveLoad.status === 'ready' ? effectiveLoad.dataset : null;
+  const universeCsv = useMemo(() => {
+    if (storedUniverse) return storedUniverse.csv;
+    if (datasetForSeed && !datasetForSeed.meta.isSample) return universeCsvFromDataset(datasetForSeed) ?? DEFAULT_UNIVERSE_CSV;
+    return DEFAULT_UNIVERSE_CSV;
+  }, [storedUniverse, datasetForSeed]);
+  const favorites = useMemo(() => readFavoriteCodes(universeCsv), [universeCsv]);
+
+  const setUniverseCsv = useCallback((csv: string) => {
+    const next = { csv, updatedAt: new Date().toISOString() };
+    setStoredUniverse(next);
+    return writeUniverse(next);
   }, []);
 
-  const selectFile = useCallback((nextFile: string) => {
-    setDatasetOverride(null);
-    setFile(nextFile);
-  }, [setDatasetOverride]);
+  const toggleFavorite = useCallback(
+    (code: string, on?: boolean) => setUniverseCsv(setFavorite(universeCsv, code, on ?? !favorites.has(code))),
+    [universeCsv, favorites, setUniverseCsv],
+  );
+
+  const selectFile = useCallback(
+    (nextFile: string) => {
+      setDatasetOverride(null);
+      setFile(nextFile);
+      // 既定を選び直したら「選択なし」に戻す（次に新しいデータを公開したとき自動で切り替わる）
+      setSelection(manifest && nextFile !== manifest.default ? { file: nextFile, defaultAt: manifest.default } : null);
+    },
+    [setDatasetOverride, manifest],
+  );
 
   const resetScoring = useCallback(() => setScoring(DEFAULT_SCORING_CONFIG), []);
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
@@ -275,8 +399,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     analysis,
     datasetOverride,
     setDatasetOverride,
-    favoritesOverride,
-    setFavoritesOverride,
+    universeCsv,
+    universeUpdatedAt: storedUniverse?.updatedAt ?? null,
+    setUniverseCsv,
+    favorites,
+    toggleFavorite,
     reload,
     todayLoad,
     todayOverride,

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { formatScore } from '../lib/format';
 import { WATCH_ACTION_LABELS, type WatchAction, type WatchItem } from '../lib/todayAnalysis';
+import { PickRoleBadge } from './TodayMemoBoards';
 import { ChangePct, cx } from './ui';
 
 const ACTION_CLASS: Record<WatchAction, string> = {
@@ -50,7 +51,13 @@ function Cautions({ items, expanded }: { items: string[]; expanded: boolean }) {
   );
 }
 
-export function TodayWatchlist({ items }: { items: WatchItem[] }) {
+export function TodayWatchlist({
+  items,
+  openBasis = 'expected',
+}: {
+  items: WatchItem[];
+  openBasis?: 'actual' | 'expected' | 'unknown';
+}) {
   const [expanded, setExpanded] = useState(false);
   const clamp = expanded ? '' : 'line-clamp-2';
 
@@ -61,7 +68,9 @@ export function TodayWatchlist({ items }: { items: WatchItem[] }) {
           <h2 id="today-watchlist" className="text-[13px] font-bold">
             今日の監視銘柄
           </h2>
-          <span className="text-[11.5px] text-muted">スイング上位候補 × 今日の地合い・想定寄り・日経VIで簡易判定</span>
+          <span className="text-[11.5px] text-muted">
+            スイング上位候補（＋市況メモの本線・確認後）× 今日の地合い・{openBasis === 'actual' ? '実際の寄り' : openBasis === 'unknown' ? '想定寄り（未確認）' : '想定寄り'}・日経VIで簡易判定
+          </span>
         </div>
         <button
           type="button"
@@ -74,7 +83,7 @@ export function TodayWatchlist({ items }: { items: WatchItem[] }) {
       </header>
 
       {/* PC */}
-      <div className="hidden overflow-x-auto md:block">
+      <div className="relative hidden overflow-x-auto md:block">
         <table className="data-table [&_td]:py-2">
           <thead>
             <tr>
@@ -86,9 +95,12 @@ export function TodayWatchlist({ items }: { items: WatchItem[] }) {
             </tr>
           </thead>
           <tbody>
-            {items.map(({ candidate: c, action, reason, cautions }) => (
-              <tr key={c.code} className="align-top">
-                <td className="num text-right text-[14px] font-semibold text-ink-2">{c.rank}</td>
+            {items.map(({ candidate: c, action, reason, cautions, memoRole, origin }) => (
+              <tr key={c.code} className={cx('align-top', origin === 'memo' && 'bg-panel-2/60')}>
+                <td className="num text-right text-[14px] font-semibold text-ink-2">
+                  {c.rank}
+                  {origin === 'memo' && <div className="text-[10px] font-normal text-muted">メモ</div>}
+                </td>
                 <td className="min-w-[11rem] whitespace-nowrap">
                   <Link to={`/candidates/${c.code}`} className="font-semibold hover:text-accent hover:underline">
                     <span className="num mr-1.5 text-[12px] font-medium text-ink-2">{c.code}</span>
@@ -100,7 +112,14 @@ export function TodayWatchlist({ items }: { items: WatchItem[] }) {
                   </div>
                 </td>
                 <td>
-                  <WatchActionBadge action={action} />
+                  <div className="flex flex-col items-start gap-1">
+                    <WatchActionBadge action={action} />
+                    {memoRole && (
+                      <span className="flex items-center gap-1 text-[10.5px] text-muted">
+                        メモ <PickRoleBadge role={memoRole} />
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="max-w-[18rem] text-[12.5px]">
                   <p className={cx('leading-snug', clamp)} title={reason}>
@@ -118,15 +137,18 @@ export function TodayWatchlist({ items }: { items: WatchItem[] }) {
 
       {/* スマホ */}
       <ol className="divide-y divide-rule md:hidden">
-        {items.map(({ candidate: c, action, reason, cautions }) => (
-          <li key={c.code} className="px-4 py-3">
+        {items.map(({ candidate: c, action, reason, cautions, memoRole, origin }) => (
+          <li key={c.code} className={cx('px-4 py-3', origin === 'memo' && 'bg-panel-2/60')}>
             <div className="flex items-start justify-between gap-2">
               <Link to={`/candidates/${c.code}`} className="font-semibold">
                 <span className="num mr-1 text-[12px] text-ink-2">{c.rank}.</span>
                 <span className="num mr-1.5 text-[12px] font-medium text-ink-2">{c.code}</span>
                 {c.name}
               </Link>
-              <WatchActionBadge action={action} />
+              <span className="flex shrink-0 items-center gap-1">
+                {memoRole && <PickRoleBadge role={memoRole} />}
+                <WatchActionBadge action={action} />
+              </span>
             </div>
             <p className={cx('mt-1 text-[12.5px] leading-snug', clamp)}>{reason}</p>
             <div className="mt-1">
@@ -138,7 +160,7 @@ export function TodayWatchlist({ items }: { items: WatchItem[] }) {
 
       <p className="border-t border-rule px-4 py-2 text-[11px] text-muted">
         判定：リスクオフ・リスクスコア基準超・本日決算 → 見送り ／ 急騰翌日・想定GUが許容超・GD想定・日経VI高め・スタンス・押し目型 → 押し目待ち ／
-        それ以外 → 寄り追いOK（閾値は src/lib/todayAnalysis.ts と today-market.json の watchlistRules）
+        それ以外 → 寄り追いOK。市況メモの「避ける」は見送り、「待機」「確認後」は寄り追いにしない（閾値は src/lib/todayAnalysis.ts と today-market.json の watchlistRules）
       </p>
     </section>
   );

@@ -47,7 +47,42 @@ export function gapUpTolerancePct(atrPct: number | null): number {
   return Math.min(4, Math.max(2, Math.round((atrPct ?? 3) * 0.8 * 2) / 2));
 }
 
+/** GD の許容幅（%）：これを超えるGDは原則見送り。値幅（ATR%）の大きい銘柄ほど広め（1〜3%、0.5刻み） */
+export function gapDownTolerancePct(atrPct: number | null): number {
+  return Math.min(3, Math.max(1, Math.round((atrPct ?? 3) * 0.5 * 2) / 2));
+}
+
 type PlanSource = Pick<Candidate, 'price' | 'technical' | 'volume' | 'earnings'>;
+
+/**
+ * GD（ギャップダウン）時の対応。
+ *   - 寄りでは買わず、寄り後15〜30分の下げ止まりと VWAP 回復を確認する
+ *   - 形の前提になる水準（高値ブレイクのブレイク水準、押し目の25日線）を割って寄ったら見送り（見送り条件と同じ）
+ *   - それ以外は、エントリー下限（急騰後・自律反発は前日安値）を回復・維持できれば押し目候補
+ *   - 許容幅を超えるGD・日経先物 −1.5%超の下落は、リバウンド狙いに切り替えず原則見送り
+ */
+export function gapDownRuleFor(c: PlanSource & { entryPlan?: Pick<EntryPlan, 'zoneLow'> }, m: DerivedMetrics): string {
+  const { close, high20d, low } = c.price;
+  const { ma25 } = c.technical;
+  const setup = classifySetup(c, m);
+  const gd = gapDownTolerancePct(m.atrPct);
+  const gdPrice = roundToTick(close * (1 - gd / 100), 'down');
+  const zoneLow = c.entryPlan?.zoneLow;
+
+  let watch: string;
+  if (setup === 'breakout') {
+    watch = `ブレイク水準（${formatPrice(high20d)}円）を割って寄り付いたら見送り。上で寄れば、エントリー下限${zoneLow ? `（${formatPrice(zoneLow)}円）` : ''}を回復できたら押し目候補`;
+  } else if (setup === 'pullback') {
+    watch = `25日線（${formatLevel(ma25)}円）を割って寄り付いたら見送り。上を保てば押し目候補`;
+  } else if ((setup === 'post-surge' || setup === 'rebound') && low !== undefined) {
+    watch = `前日安値（${formatPrice(low)}円）を割らずに下げ止まれば押し目候補、割り込んだら見送り`;
+  } else if (zoneLow !== undefined) {
+    watch = `エントリー下限（${formatPrice(zoneLow)}円）を回復できれば押し目候補、できなければ見送り`;
+  } else {
+    watch = '前日終値近辺まで戻せれば押し目候補、戻せなければ見送り';
+  }
+  return `寄りでは買わず、寄り後15〜30分の下げ止まりとVWAP回復を確認。${watch}。前日終値比−${gd}%（${formatPrice(gdPrice)}円）超のGD、または日経先物が−1.5%超の下落なら、リバウンド狙いに切り替えず原則見送り。`;
+}
 
 export function classifySetup(c: PlanSource, m: DerivedMetrics): SetupType {
   if (c.price.changePct >= 5) return 'post-surge';
@@ -65,6 +100,31 @@ export interface TradePlan {
   skipConditions: string[];
 }
 
+/**
+ * 2つ目の利確の距離（ATRの何倍か）。4営業日以上の保有で3倍。保有が短いほど値幅も出にくいので、
+ * √日数に比例して縮める（3日で2.6倍、2日で2.1倍。1つ目の1.5倍より必ず遠い2倍を下限にする）。
+ */
+export function secondTargetAtrMultiple(holdingDays: number): number {
+  return Math.round(Math.min(3, Math.max(2, 1.5 * Math.sqrt(Math.max(1, holdingDays)))) * 10) / 10;
+}
+
+/**
+ * 利確の目安。保有期間の長さと OUT の日で決まるので、表示中の保有パターンで計算し直せるよう分けている
+ * （analysis.ts が保有パターンを切り替えるたびに呼ぶ）。
+ */
+export function takeProfitFor(c: { price: { close: number }; technical: { atr14: number } }, window: HoldingWindow): TakeProfit {
+  const { close } = c.price;
+  const atr = c.technical.atr14;
+  const multiple = secondTargetAtrMultiple(window.holdingDays.length);
+  return {
+    targets: [
+      { price: roundToTick(close + atr * 1.5, 'up'), label: '半分利確' },
+      { price: roundToTick(close + atr * multiple, 'up'), label: '残り利確' },
+    ],
+    rule: `届かなければ残りは5日線割れでトレール。${formatDateJa(window.exitDate)}大引けまでに全決済（持ち越さない）。`,
+  };
+}
+
 export function buildTradePlan(
   c: PlanSource,
   m: DerivedMetrics,
@@ -77,6 +137,7 @@ export function buildTradePlan(
   const atrPct = m.atrPct;
 
   const guPct = gapUpTolerancePct(atrPct);
+  const gdPct = gapDownTolerancePct(atrPct);
   const guPrice = roundToTick(close * (1 + guPct / 100));
   const gapUpRule = `前日終値比+${guPct}%（${formatPrice(guPrice)}円）超のGUは寄りで追わず、5分足でVWAPを回復してからの押しを待つ。+${guPct * 2}%超は見送り。`;
 
@@ -138,6 +199,8 @@ export function buildTradePlan(
     }
   }
 
+  entryPlan.gapDownRule = gapDownRuleFor({ ...c, entryPlan }, m);
+
   // ---- 損切り ----
   // ATRベースと構造ベースのうち近い方を採用し、エントリーゾーン下限より必ず下に置く。最大-8%
   const atrStop = close - atr * 1.5;
@@ -155,18 +218,10 @@ export function buildTradePlan(
   const stopLoss: StopLoss = { price: stopPrice, rule: stopRule };
 
   // ---- 利確 ----
-  const t1 = roundToTick(close + atr * 1.5, 'up');
-  const t2 = roundToTick(close + atr * 3, 'up');
-  const takeProfit: TakeProfit = {
-    targets: [
-      { price: t1, label: '半分利確' },
-      { price: t2, label: '残り利確' },
-    ],
-    rule: `届かなければ残りは5日線割れでトレール。${formatDateJa(window.exitDate)}大引けまでに全決済（持ち越さない）。`,
-  };
+  const takeProfit = takeProfitFor(c, window);
 
   // ---- 見送り条件 ----
-  const skip: string[] = [`寄りで前日終値比+${guPct * 2}%超のGU`];
+  const skip: string[] = [`寄りで前日終値比+${guPct * 2}%超のGU`, `寄りで前日終値比−${gdPct}%超のGD`];
   if (setup === 'breakout') skip.push(`ブレイク水準（${formatPrice(high20d)}円）を割って寄り付いた場合`);
   if (setup === 'pullback') skip.push(`25日線（${formatLevel(ma25)}円）を割って寄り付いた場合`);
   if (setup === 'post-surge') skip.push('前日高値を超えられず、前場で陰線になった場合');

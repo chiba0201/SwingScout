@@ -13,7 +13,6 @@
     "test:watch": "vitest",
     "data:mock": "tsx scripts/build-data.ts --provider mock --out data/mock-candidates.json",
     "data:watchlist": "tsx scripts/build-data.ts --provider watchlist",
-    "data:favorites": "tsx scripts/build-data.ts --provider watchlist --out data/favorites.json --label お気に入り監視 --no-manifest",
     "data:universe": "tsx scripts/build-data.ts --provider universe",
     "data:build": "tsx scripts/build-data.ts",
     "local:api": "tsx scripts/local-api.ts",

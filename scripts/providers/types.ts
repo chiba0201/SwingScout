@@ -33,6 +33,8 @@ export interface UniverseEntry {
   /** 東証33業種 */
   sector: string;
   theme?: string;
+  /** お気に入り（銘柄リストの favorite 列）。足切りの対象外になる */
+  favorite?: boolean;
 }
 
 export interface UniverseSource {

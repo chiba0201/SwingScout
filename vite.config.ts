@@ -69,6 +69,12 @@ export default defineConfig({
   // 相対パスで出力し、さくらのサブディレクトリ（例: /swingscout/）にもそのまま置けるようにする
   base: './',
   plugins: [react(), tailwindcss(), staticDataDir()],
+  // ブラウザ保存（銘柄リスト・お気に入り・日足など）はアドレス＋ポートごとに分かれるので、ポートを固定する。
+  // 使用中のときは別のポートにずらさずエラーで止める（ずれるとデータが消えたように見えるため）
+  server: {
+    port: 5174,
+    strictPort: true,
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

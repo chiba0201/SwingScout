@@ -30,6 +30,7 @@ export function validateDataset(json: unknown, file = 'dataset'): Dataset {
   if (typeof json.asOf !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(json.asOf)) return fail('asOf が YYYY-MM-DD ではありません');
   if (!isObject(json.marketContext)) return fail('marketContext がありません');
   if (!Array.isArray(json.candidates)) return fail('candidates が配列ではありません');
+  if (json.universe !== undefined && !Array.isArray(json.universe)) fail('universe が配列ではありません');
   json.candidates.forEach((c, i) => {
     if (!isObject(c) || typeof c.code !== 'string' || !isObject(c.price) || !isObject(c.technical)) {
       fail(`candidates[${i}] の必須項目（code, price, technical）が不足しています`);

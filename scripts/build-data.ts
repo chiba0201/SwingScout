@@ -8,10 +8,10 @@
  *   --provider mock|local   データ源（既定 mock）
  *   --as-of YYYY-MM-DD      基準日（既定: mock は 2026-10-05、local は直近の営業日）
  *   --out <path>            出力先（既定 data/<基準日>.json）
- *   --pattern tue-fri       保有パターン（tue-fri / mon-fri / tue-thu）
- *   --keep 12 --top 6       保存件数 / 今週の候補件数
+ *   --pattern tue-fri       保有パターン（tue-fri / mon-fri / tue-thu / wed-fri / thu-fri）
+ *   --keep 12 --top 6       保存件数（universe は既定で全銘柄）/ 今週の候補件数
  *   --label <text>          manifest に表示する名前
- *   --no-manifest           data/ に出力しても manifest を更新しない（favorites.json など）
+ *   --no-manifest           data/ に出力しても manifest を更新しない
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
@@ -59,7 +59,8 @@ async function main() {
     ...DEFAULT_PIPELINE_OPTIONS,
     asOf,
     patternId: values.pattern,
-    keep: values.keep ? Number(values.keep) : DEFAULT_PIPELINE_OPTIONS.keep,
+    // 代表銘柄スクリーニングは全銘柄を残す（候補一覧の「全銘柄」とお気に入りに使う）
+    keep: values.keep ? Number(values.keep) : provider === 'universe' ? Number.POSITIVE_INFINITY : DEFAULT_PIPELINE_OPTIONS.keep,
     topN: values.top ? Number(values.top) : DEFAULT_PIPELINE_OPTIONS.topN,
   });
 

@@ -1,5 +1,25 @@
 /** 地合い関連の判定・ラベル（ダッシュボードとレポートで共通） */
-import type { Importance, MarketEventCategory, MarketStance } from '../types/dataset';
+import type { Importance, ISODate, MarketContext, MarketEventCategory, MarketStance } from '../types/dataset';
+import type { TodayMarket } from '../types/today';
+import { formatDateJa, toTime } from './calendar';
+
+/**
+ * 地合いが「いつ時点」のものか。Today の市況メモから作った地合いはメモの日付・セッション、
+ * それ以外（手書きの market.json など）は候補の基準日（前日の引け）。
+ */
+export function marketContextWhen(mc: MarketContext, datasetAsOf: ISODate): string {
+  const s = mc.source;
+  if (s?.kind === 'today') return `${formatDateJa(s.asOf)} ${s.session}の市況${s.checkedAt ? `（${s.checkedAt}確認）` : ''}`;
+  return `基準日 ${formatDateJa(datasetAsOf)} 引け`;
+}
+
+/** 候補データを作った後に Today が更新されたか（されていれば、再生成で地合いが新しくなる） */
+export function marketContextOutdated(mc: MarketContext, today: TodayMarket | null): boolean {
+  const s = mc.source;
+  if (s?.kind !== 'today' || !today) return false;
+  if (toTime(today.asOf) !== toTime(s.asOf)) return toTime(today.asOf) > toTime(s.asOf);
+  return today.meta.generatedAt > s.reflectedAt;
+}
 
 export const STANCE_LABELS: Record<MarketStance, string> = {
   bullish: '強気',

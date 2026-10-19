@@ -9,22 +9,52 @@ import type { Quote } from '../types/dataset';
 import { formatDateJa } from './calendar';
 import { formatDateTime, formatNumber, formatPct, formatSigned, inferDecimals } from './format';
 import type { ParsedMarketMemo } from './marketMemo';
-import { WATCH_ACTION_LABELS, type TodayAnalysis } from './todayAnalysis';
+import { PICK_ROLE_LABELS, WATCH_ACTION_LABELS, type TodayAnalysis } from './todayAnalysis';
 
 const IMPORTANCE_STARS = { high: '★★★', medium: '★★', low: '★' } as const;
 
 /** 表セル用のエスケープ */
 const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
+const SECTOR_LABELS = { priority: '優先', select: '選別', caution: '慎重' } as const;
+
 function quoteRow(q: Quote): string {
   const digits = q.decimals ?? inferDecimals(q.value);
-  const change =
-    q.change === 0 && q.changePct !== 0
+  const change = q.changeUnknown
+    ? '—'
+    : q.change === 0 && q.changePct !== 0
       ? formatPct(q.changePct, 2)
       : q.unit === '%'
         ? formatSigned(q.change, 2)
         : `${formatSigned(q.change, Math.max(digits, 1))}（${formatPct(q.changePct, 2)}）`;
-  return `| ${cell(q.label)} | ${formatNumber(q.value, digits)}${q.unit ?? ''} | ${change} |`;
+  return `| ${cell(q.label)}${q.note ? `（${cell(q.note)}）` : ''} | ${formatNumber(q.value, digits)}${q.unit ?? ''} | ${change} |`;
+}
+
+/** 市況メモのまとめから取れた売買方針・セクター・節目（無ければ空） */
+function renderPlan(t: TodayAnalysis, h: string): string[] {
+  const d = t.today;
+  const lines: string[] = [];
+  const roles = (['main', 'confirm', 'wait', 'avoid'] as const)
+    .map((role) => ({ role, picks: t.picks.filter((p) => p.role === role) }))
+    .filter((g) => g.picks.length > 0);
+  if (roles.length > 0 || d.plan?.entry || d.plan?.invalidation || d.plan?.stopLoss || d.sectorStances?.length) {
+    lines.push('', `${h} 今日の売買方針`, '');
+    for (const { role, picks } of roles) {
+      const names = picks.map((p) => `${p.name}${p.code ? `（${p.code}）` : ''}${p.candidate ? ` ${p.candidate.rank}位` : ''}`);
+      lines.push(`- **${PICK_ROLE_LABELS[role]}**: ${names.join('、')}`);
+    }
+    if (d.plan?.entry) lines.push(`- **入る条件**: ${d.plan.entry}`);
+    if (d.plan?.invalidation) lines.push(`- **撤回条件**: ${d.plan.invalidation}`);
+    if (d.plan?.stopLoss) lines.push(`- **損切り**: ${d.plan.stopLoss}`);
+    for (const kind of ['priority', 'select', 'caution'] as const) {
+      const sectors = (d.sectorStances ?? []).filter((s) => s.stance === kind).map((s) => s.sector);
+      if (sectors.length) lines.push(`- **セクター（${SECTOR_LABELS[kind]}）**: ${sectors.join('、')}`);
+    }
+  }
+  if (d.levels?.length) {
+    lines.push('', `${h} 日経の節目`, '', ...d.levels.map((l) => `- ${formatNumber(l.price, l.price % 1 === 0 ? 0 : 2)}：${l.label}`));
+  }
+  return lines;
 }
 
 // ---------------------------------------------------------------------------
@@ -36,12 +66,22 @@ function renderStructured(t: TodayAnalysis, h: string): string[] {
   const lines: string[] = [
     `> **スタンス: ${d.stance}** — ${d.headline}`,
     '',
-    `- 想定寄り: ${d.expectedOpen.label}（${formatPct(d.expectedOpen.gapPct)}）${d.expectedOpen.note ? ` — ${d.expectedOpen.note}` : ''}`,
+    ...(t.open.basis === 'actual' ? [`- 実際の寄り: ${t.open.label}（${formatPct(t.open.gapPct, 2)}）`] : []),
+    d.expectedOpen.unconfirmed
+      ? `- 想定寄り: 未確認${d.expectedOpen.note ? ` — ${d.expectedOpen.note}` : ''}`
+      : `- 想定寄り: ${d.expectedOpen.label}（${formatPct(d.expectedOpen.gapPct)}）${d.expectedOpen.note ? ` — ${d.expectedOpen.note}` : ''}`,
     `- サイズ目安: ${d.positionSize.label}${d.positionSize.reason ? ` — ${d.positionSize.reason}` : ''}`,
     `- スイング: ${t.swingRole.label}`,
   ];
   if (t.vi) lines.push(`- ${t.vi.label}: ${t.vi.value.toFixed(2)}（${t.vi.source === 'today' ? '当日' : '前日終値'}）`);
+  if (d.checkedAt) lines.push(`- 情報確認: ${d.checkedAt}`);
+  const { important, other } = t.unconfirmed;
+  if (important.length || other.length) {
+    lines.push(`- 未確認: ${important.length ? important.join('、') : 'なし'}（一次情報で確認）${other.length ? `。ほかに参考の未確認${other.length}件` : ''}`);
+  }
   for (const n of t.notices) lines.push(`- 注意: ${n}`);
+
+  lines.push(...renderPlan(t, h));
 
   if (d.externalQuotes.length > 0) {
     lines.push('', `${h} 外部指標`, '', '| 指標 | 値 | 前日比 |', '|---|---:|---:|', ...d.externalQuotes.map(quoteRow));
@@ -61,7 +101,8 @@ function renderStructured(t: TodayAnalysis, h: string): string[] {
   } else {
     lines.push('| 時刻 | イベント | 重要度 | メモ |', '|---|---|---|---|');
     for (const e of t.events) {
-      lines.push(`| ${e.time ?? '—'} | ${cell(e.label)} | ${IMPORTANCE_STARS[e.importance]} | ${cell(e.note ?? '')} |`);
+      const when = `${e.date && e.date !== d.asOf ? `${formatDateJa(e.date)} ` : ''}${e.time ?? '—'}`;
+      lines.push(`| ${when} | ${cell(e.label)} | ${IMPORTANCE_STARS[e.importance]} | ${cell(e.note ?? '')} |`);
     }
   }
 

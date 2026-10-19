@@ -18,7 +18,9 @@ import {
   addDays,
   computeHoldingWindow,
   DEFAULT_HOLDING_PATTERN,
+  formatDateJa,
   holidayName,
+  prevBusinessDay,
   sqDate,
   toTime,
   type HoldingPattern,
@@ -26,6 +28,7 @@ import {
 } from './calendar';
 import { computeMetrics, type DerivedMetrics } from './metrics';
 import { DEFAULT_SCORING_CONFIG, rankCandidates, type ScoringConfig } from './scoring';
+import { gapDownRuleFor, gapDownTolerancePct, takeProfitFor } from './tradePlan';
 import { deriveWarnings, findConcentration, type ConcentrationGroup, type WarningTag } from './warnings';
 
 export interface AnalysisOptions {
@@ -56,6 +59,11 @@ export interface CalendarEvent extends MarketEvent {
 export interface DatasetAnalysis {
   dataset: Dataset;
   window: HoldingWindow;
+  /**
+   * 作戦の確度。作戦の価格（入り方・損切り・利確）はデータ基準日の引けから計算するので、
+   * 基準日が IN の前営業日より前なら暫定（IN の前営業日の引け後に作り直すと確定）。
+   */
+  plan: { provisional: boolean; basisDate: ISODate; confirmAfter: ISODate };
   options: AnalysisOptions;
   /** 全候補（スコア降順、rank 振り直し済み） */
   ranked: AnalyzedCandidate[];
@@ -124,6 +132,24 @@ function buildEvents(dataset: Dataset, window: HoldingWindow, top: Candidate[]):
   );
 }
 
+/** GD時の対応が無い古いデータには、その場で作って補う（見送り条件にも大きなGDを足す） */
+function withGapDownRule(c: Candidate, m: DerivedMetrics): Pick<Candidate, 'entryPlan' | 'risks'> {
+  if (c.entryPlan.gapDownRule) return { entryPlan: c.entryPlan, risks: c.risks };
+  const skip = c.risks.skipConditions.some((s) => /GD/.test(s))
+    ? c.risks.skipConditions
+    : [...c.risks.skipConditions, `寄りで前日終値比−${gapDownTolerancePct(m.atrPct)}%超のGD`];
+  return {
+    entryPlan: { ...c.entryPlan, gapDownRule: gapDownRuleFor(c, m) },
+    risks: { ...c.risks, skipConditions: skip },
+  };
+}
+
+/** 暫定の作戦の説明（画面とレポートで共通）。確定なら null */
+export function provisionalPlanMessage(a: Pick<DatasetAnalysis, 'plan' | 'window'>): string | null {
+  if (!a.plan.provisional) return null;
+  return `${formatDateJa(a.plan.basisDate)} 引けの日足で作った暫定の作戦です。IN（${formatDateJa(a.window.entryDate)}）の前営業日 ${formatDateJa(a.plan.confirmAfter)} の引け後に日足を取り直して生成すると確定します。`;
+}
+
 export function analyzeDataset(
   dataset: Dataset,
   options: AnalysisOptions = DEFAULT_ANALYSIS_OPTIONS,
@@ -142,6 +168,9 @@ export function analyzeDataset(
     const inTop = idx < options.topN;
     return {
       ...s.candidate,
+      ...withGapDownRule(s.candidate, s.metrics),
+      // 利確は保有期間の長さと OUT の日で決まるので、表示中の保有パターンで計算し直す
+      takeProfit: takeProfitFor(s.candidate, window),
       rank: idx + 1,
       scores: { ...s.scores, factors: s.scores.factors ?? [] },
       metrics: s.metrics,
@@ -149,9 +178,11 @@ export function analyzeDataset(
     };
   });
 
+  const confirmAfter = prevBusinessDay(window.entryDate);
   return {
     dataset,
     window,
+    plan: { provisional: toTime(dataset.asOf) < toTime(confirmAfter), basisDate: dataset.asOf, confirmAfter },
     options,
     ranked,
     top: ranked.slice(0, options.topN),

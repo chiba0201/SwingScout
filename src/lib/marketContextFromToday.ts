@@ -11,7 +11,8 @@ const pick = (quotes: Quote[], ids: Set<string>) => quotes.filter((q) => ids.has
 
 const toMarketEvent = (today: TodayMarket): MarketEvent[] =>
   today.events.map((e) => ({
-    date: today.asOf,
+    // 翌日早朝の米指標など、当日以外のイベントはその日付で
+    date: e.date ?? today.asOf,
     time: e.time,
     label: e.label,
     category: e.category ?? 'other',
@@ -30,8 +31,9 @@ export function marketContextFromToday(today: TodayMarket, stance?: MarketContex
           ? 'bearish'
           : 'neutral'),
     headline: today.headline,
-    summaryToday: today.expectedOpen.note ?? today.headline,
-    summaryWeek: today.domesticNotes.slice(0, 2).join('。') || today.headline,
+    summaryToday: today.headline,
+    // 今週の見通しはメモのまとめの「今週」だけ。無ければ空（今日の結論で埋めると、画面で同じ文が並ぶため）
+    summaryWeek: today.weekOutlook ?? '',
     indices: pick(q, indexIds),
     volatility: pick(q, volatilityIds),
     fx: pick(q, fxIds),
@@ -42,5 +44,12 @@ export function marketContextFromToday(today: TodayMarket, stance?: MarketContex
       today.positionSize.reason,
       ...today.domesticNotes.filter((x) => /注意|確認|警戒|持ち高|決算|SQ/.test(x)),
     ].filter((x): x is string => Boolean(x)),
+    source: {
+      kind: 'today',
+      asOf: today.asOf,
+      session: today.session,
+      ...(today.checkedAt ? { checkedAt: today.checkedAt } : {}),
+      reflectedAt: today.meta.generatedAt,
+    },
   };
 }

@@ -125,6 +125,32 @@ export function prevBusinessDay(date: ISODate): ISODate {
   return d;
 }
 
+// ---------------------------------------------------------------------------
+// 日本時間の「いま」（now を渡せばテストで固定できる。日本は夏時間なし）
+// ---------------------------------------------------------------------------
+
+/** 東証の大引け（15:30）を分で表したもの */
+const MARKET_CLOSE_MINUTES = 15 * 60 + 30;
+
+export function jstNow(now: Date = new Date()): { date: ISODate; minutes: number } {
+  const t = new Date(now.getTime() + 9 * 3_600_000);
+  return {
+    date: fromTime(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate())),
+    minutes: t.getUTCHours() * 60 + t.getUTCMinutes(),
+  };
+}
+
+/** 日本時間の今日 */
+export function todayJst(now?: Date): ISODate {
+  return jstNow(now).date;
+}
+
+/** その時点で確定している最新の終値の日付（営業日の15:30以降は当日、それ以外は前営業日） */
+export function latestCloseDate(now?: Date): ISODate {
+  const { date, minutes } = jstNow(now);
+  return isBusinessDay(date) && minutes >= MARKET_CLOSE_MINUTES ? date : prevBusinessDay(date);
+}
+
 /** n 営業日後（n<0 なら前）。date 自体が休場でも可 */
 export function addBusinessDays(date: ISODate, n: number): ISODate {
   let d = date;
@@ -189,6 +215,9 @@ export const HOLDING_PATTERNS: readonly HoldingPattern[] = [
   { id: 'tue-fri', label: '火曜In金曜out', entryWeekday: 2, exitWeekday: 5 },
   { id: 'mon-fri', label: '月曜In金曜out', entryWeekday: 1, exitWeekday: 5 },
   { id: 'tue-thu', label: '火曜In木曜out', entryWeekday: 2, exitWeekday: 4 },
+  // 週の途中から入る短い保有（今週の残りで金曜に出る）
+  { id: 'wed-fri', label: '水曜In金曜out', entryWeekday: 3, exitWeekday: 5 },
+  { id: 'thu-fri', label: '木曜In金曜out', entryWeekday: 4, exitWeekday: 5 },
 ];
 
 export const DEFAULT_HOLDING_PATTERN: HoldingPattern = HOLDING_PATTERNS[0]!;

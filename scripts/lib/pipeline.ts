@@ -17,6 +17,7 @@ import {
   type Candidate,
   type Dataset,
   type ISODate,
+  type UniverseStatus,
 } from '../../src/types/dataset';
 import type { ProviderSet } from '../providers/types';
 
@@ -57,14 +58,22 @@ export async function runPipeline(providers: ProviderSet, options: PipelineOptio
   ]);
   log(`ユニバース ${universe.length}銘柄`);
 
-  // 日足 → スナップショット → 足切り
+  // 日足 → スナップショット → 足切り（お気に入りは足切りしない）
+  const status = new Map<string, UniverseStatus>();
   const screened: { entry: (typeof universe)[number]; snap: ReturnType<typeof buildSnapshots> }[] = [];
   for (const entry of universe) {
     const bars = await providers.prices.getDailyBars(entry.code, asOf, options.lookbackDays);
-    if (!bars || bars.length < 27) continue;
-    if (bars[bars.length - 1]!.date !== asOf) continue; // 基準日の足が無い（売買停止など）
+    // 日足が無い・基準日の足が無い（売買停止など）
+    if (!bars || bars.length < 27 || bars[bars.length - 1]!.date !== asOf) {
+      status.set(entry.code, 'no-prices');
+      continue;
+    }
     const snap = buildSnapshots(bars);
-    if (snap.volume.turnoverOku < options.minTurnoverOku || snap.price.close < options.minPrice) continue;
+    if (!entry.favorite && (snap.volume.turnoverOku < options.minTurnoverOku || snap.price.close < options.minPrice)) {
+      status.set(entry.code, 'filtered');
+      continue;
+    }
+    status.set(entry.code, 'scored');
     screened.push({ entry, snap });
   }
   log(`足切り通過 ${screened.length}銘柄（売買代金${options.minTurnoverOku}億円以上・株価${options.minPrice}円以上）`);
@@ -86,6 +95,7 @@ export async function runPipeline(providers: ProviderSet, options: PipelineOptio
       market: entry.market,
       sector: entry.sector,
       theme: ann.theme ?? entry.theme ?? entry.sector,
+      favorite: entry.favorite || undefined,
       scores: EMPTY_SCORES,
       ...snap,
       margin: margins.get(entry.code) ?? null,
@@ -126,6 +136,15 @@ export async function runPipeline(providers: ProviderSet, options: PipelineOptio
     asOf,
     marketContext: market,
     candidates: drafts,
+    universe: universe.map((u) => ({
+      code: u.code,
+      name: u.name,
+      sector: u.sector,
+      market: u.market,
+      theme: u.theme,
+      favorite: !!u.favorite,
+      status: status.get(u.code) ?? 'no-prices',
+    })),
   };
 
   // スコア・順位を付けて上位 keep 件だけ残す（factors 内訳は UI で再計算するので保存しない）
@@ -135,6 +154,6 @@ export async function runPipeline(providers: ProviderSet, options: PipelineOptio
     const { factors: _f, ...summary } = scores;
     return { ...rest, scores: summary };
   });
-  log(`上位${dataset.candidates.length}銘柄を保存`);
+  log(`${dataset.candidates.length}銘柄を保存（銘柄リスト ${universe.length}銘柄）`);
   return dataset;
 }

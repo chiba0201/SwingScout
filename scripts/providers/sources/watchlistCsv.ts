@@ -3,13 +3,14 @@
  *
  * 置き場所: raw-data/watchlist.csv または raw-data/universe.csv
  * 必須列: code, name, sector
- * 任意列: market, theme, usdJpy, beta, fundamentalNote, flags, skipConditions, pattern
+ * 任意列: market, theme, usdJpy, beta, fundamentalNote, flags, skipConditions, pattern, favorite（1 でお気に入り）
  *
  * JPXの全銘柄一覧を整える前に、まず監視したい銘柄・代表銘柄ユニバースだけで
  * 実データセットを作るための入口。
  */
 import { resolve } from 'node:path';
 import type { CandidateComments, Sensitivity } from '../../../src/types/dataset';
+import { isFavoriteValue } from '../../../src/lib/universeCsv';
 import { readCsvRecords } from '../../lib/csv';
 import type { Annotation, AnnotationSource, UniverseEntry, UniverseSource } from '../types';
 
@@ -47,6 +48,7 @@ export class WatchlistCsvSource implements UniverseSource, AnnotationSource {
         market: r.market ?? r['市場'] ?? undefined,
         sector: r.sector ?? r['業種'] ?? '',
         theme: r.theme ?? r['テーマ'] ?? undefined,
+        favorite: isFavoriteValue(r.favorite ?? r['お気に入り']),
       }))
       .filter((e) => e.code && e.name && e.sector);
   }

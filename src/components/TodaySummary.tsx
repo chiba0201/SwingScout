@@ -1,7 +1,7 @@
 /**
  * 今日の結論。Today 画面ではフル表示、ダッシュボードでは1段の要約カード。
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { formatDateJa } from '../lib/calendar';
 import { formatPct } from '../lib/format';
@@ -36,7 +36,7 @@ function updatedAt(iso: string): string {
 }
 
 function Gap({ pct }: { pct: number }) {
-  return <span className={cx('num font-semibold', directionClass(pct))}>{formatPct(pct)}</span>;
+  return <span className={cx('num font-semibold', directionClass(pct))}>{formatPct(pct, 2)}</span>;
 }
 
 /** 結論の4項目（スタンス・想定寄り・サイズ・VI）の1マス。補足は2行で切り、全文は title で見られる */
@@ -54,6 +54,35 @@ function KeyFact({ label, children, sub }: { label: string; children: ReactNode;
   );
 }
 
+/**
+ * 市況メモで確認できなかった項目。今日の判断に関わるもの（想定寄り・先物・VI・SOX・ADR・メモの銘柄など）だけを出し、
+ * 参考程度のもの（騰落レシオ・新規上場など）は件数だけ出して、押したら開く。分け方は todayAnalysis.ts の classifyUnconfirmed。
+ */
+function Unconfirmed({ important, other }: { important: string[]; other: string[] }) {
+  const [showOther, setShowOther] = useState(false);
+  return (
+    <div className="space-y-0.5 border-t border-rule px-4 py-2 text-[12px]">
+      {important.length > 0 && (
+        <p className="text-caution">
+          <span className="font-bold">
+            未確認 <span className="num">{important.length}</span>件
+          </span>
+          ：{important.join('、')}
+          <span className="text-muted">（寄り前に一次情報で確認）</span>
+        </p>
+      )}
+      {other.length > 0 && (
+        <p className="text-muted">
+          <button type="button" className="font-semibold text-ink-2 hover:text-accent hover:underline" aria-expanded={showOther} onClick={() => setShowOther((v) => !v)}>
+            {important.length > 0 ? 'ほかに参考の未確認' : '参考の未確認'} <span className="num">{other.length}</span>件 {showOther ? '▴' : '▾'}
+          </button>
+          {showOther && <span className="ml-1.5">{other.join('、')}</span>}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function TodaySummary({ analysis: t }: { analysis: TodayAnalysis }) {
   const d = t.today;
   return (
@@ -63,7 +92,14 @@ export function TodaySummary({ analysis: t }: { analysis: TodayAnalysis }) {
           今日の結論
         </h2>
         <span className="text-[12px] text-ink-2">
-          <span className="num">{formatDateJa(d.asOf)}</span> ・ 更新 <span className="num">{updatedAt(d.meta.generatedAt)}</span>
+          <span className="num">{formatDateJa(d.asOf)}</span>
+          {d.checkedAt && (
+            <>
+              {' '}
+              ・ 情報確認 <span className="num">{d.checkedAt}</span>
+            </>
+          )}{' '}
+          ・ 反映 <span className="num">{updatedAt(d.meta.generatedAt)}</span>
         </span>
         <span className="rounded-sm border border-rule-strong px-1.5 text-[11px] leading-[1.6] font-semibold text-ink-2">
           {d.session}
@@ -80,9 +116,23 @@ export function TodaySummary({ analysis: t }: { analysis: TodayAnalysis }) {
         <KeyFact label="スタンス">
           <TodayStanceBadge stance={d.stance} size="lg" />
         </KeyFact>
-        <KeyFact label="想定寄り" sub={d.expectedOpen.note}>
-          {d.expectedOpen.label} <Gap pct={d.expectedOpen.gapPct} />
-        </KeyFact>
+        {/* 寄った後に実際の寄りを入れたら、そちらを主に出し、想定は補足に下げる */}
+        {t.open.basis === 'actual' && t.open.gapPct !== null ? (
+          <KeyFact
+            label="寄り付き（実際）"
+            sub={d.expectedOpen.unconfirmed ? '想定寄りは未確認だった' : `想定 ${d.expectedOpen.label} ${formatPct(d.expectedOpen.gapPct, 2)}`}
+          >
+            {t.open.label} <Gap pct={t.open.gapPct} />
+          </KeyFact>
+        ) : d.expectedOpen.unconfirmed ? (
+          <KeyFact label="想定寄り" sub={d.expectedOpen.note}>
+            <span className="text-muted">未確認</span>
+          </KeyFact>
+        ) : (
+          <KeyFact label="想定寄り" sub={d.expectedOpen.note}>
+            {d.expectedOpen.label} <Gap pct={d.expectedOpen.gapPct} />
+          </KeyFact>
+        )}
         <KeyFact label="ポジションサイズ目安" sub={d.positionSize.reason}>
           {d.positionSize.label}
         </KeyFact>
@@ -93,6 +143,10 @@ export function TodaySummary({ analysis: t }: { analysis: TodayAnalysis }) {
           {t.vi ? <span className="num">{t.vi.value.toFixed(2)}</span> : '—'}
         </KeyFact>
       </dl>
+
+      {(t.unconfirmed.important.length > 0 || t.unconfirmed.other.length > 0) && (
+        <Unconfirmed important={t.unconfirmed.important} other={t.unconfirmed.other} />
+      )}
 
       {t.notices.length > 0 && (
         <ul className="space-y-1 border-t border-rule px-4 py-2 text-[12px] text-caution">
@@ -136,8 +190,8 @@ export function TodaySummaryCard({ analysis: t, load }: { analysis: TodayAnalysi
         </div>
         <TodayStanceBadge stance={d.stance} />
         <span className="text-[12.5px]">
-          <span className="text-muted">想定寄り </span>
-          <span className="font-semibold">{d.expectedOpen.label}</span> <Gap pct={d.expectedOpen.gapPct} />
+          <span className="text-muted">{t.open.basis === 'actual' ? '寄り付き ' : '想定寄り '}</span>
+          <span className="font-semibold">{t.open.label}</span> {t.open.gapPct !== null && <Gap pct={t.open.gapPct} />}
         </span>
         <span className="text-[12.5px]">
           <span className="text-muted">サイズ </span>

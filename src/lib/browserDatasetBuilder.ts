@@ -1,15 +1,30 @@
 /**
  * ブラウザ内で raw-data 相当のCSV/JSONから Dataset を生成する。
  * サーバーへ保存はしない。生成したJSONをダウンロードして data/ に置く運用。
+ *
+ * - 銘柄リストの全銘柄を採点して残す（keep で上限を付けられる）
+ * - お気に入り（favorite 列）は売買代金・株価の足切りをしない
+ * - 採点できなかった銘柄も dataset.universe に状態つきで残す
  */
 import { analyzeDataset, DEFAULT_ANALYSIS_OPTIONS } from './analysis';
 import { computeHoldingWindow, findHoldingPattern } from './calendar';
 import { buildComments } from './commentary';
 import { csvToRecords } from './csv';
+import { isFavoriteValue } from './universeCsv';
 import { buildSnapshots, type DailyBar } from './indicators';
 import { computeMetrics } from './metrics';
 import { buildTradePlan, SETUP_LABELS } from './tradePlan';
-import { SCHEMA_VERSION, type Candidate, type Dataset, type EarningsInfo, type ISODate, type MarginSnapshot, type MarketContext, type Sensitivity } from '../types/dataset';
+import {
+  SCHEMA_VERSION,
+  type Candidate,
+  type Dataset,
+  type EarningsInfo,
+  type ISODate,
+  type MarginSnapshot,
+  type MarketContext,
+  type Sensitivity,
+  type UniverseStatus,
+} from '../types/dataset';
 
 interface UniverseEntry {
   code: string;
@@ -23,6 +38,7 @@ interface UniverseEntry {
   flags: string[];
   skipConditions: string[];
   pattern?: string;
+  favorite: boolean;
 }
 
 export interface BrowserDatasetInput {
@@ -90,6 +106,7 @@ function parseUniverse(csv: string): UniverseEntry[] {
         flags: splitList(r.flags),
         skipConditions: splitList(r.skipConditions),
         pattern: r.pattern || undefined,
+        favorite: isFavoriteValue(r.favorite ?? r['お気に入り']),
       };
     })
     .filter((e) => e.code && e.name && e.sector);
@@ -148,19 +165,31 @@ export function buildDatasetInBrowser(input: BrowserDatasetInput): BrowserDatase
   const earnings = parseEarnings(input.earningsCsv, codes);
   const missingPrices: string[] = [];
   let withPrices = 0;
+  const status = new Map<string, UniverseStatus>();
 
   const screened: { entry: UniverseEntry; snap: ReturnType<typeof buildSnapshots> }[] = [];
   for (const entry of universe) {
     const priceCsv = input.pricesByCode.get(entry.code);
     if (!priceCsv) {
       missingPrices.push(entry.code);
+      status.set(entry.code, 'no-prices');
       continue;
     }
     const bars = parsePrices(priceCsv, input.asOf, input.lookbackDays);
-    if (bars.length < 27 || bars[bars.length - 1]?.date !== input.asOf) continue;
+    // 基準日の足が無い（取得が古い・売買停止など）も「日足なし」扱い
+    if (bars.length < 27 || bars[bars.length - 1]?.date !== input.asOf) {
+      missingPrices.push(entry.code);
+      status.set(entry.code, 'no-prices');
+      continue;
+    }
     withPrices++;
     const snap = buildSnapshots(bars);
-    if (snap.volume.turnoverOku < input.minTurnoverOku || snap.price.close < input.minPrice) continue;
+    // お気に入りは足切りしない（監視したい銘柄なので必ず採点する）
+    if (!entry.favorite && (snap.volume.turnoverOku < input.minTurnoverOku || snap.price.close < input.minPrice)) {
+      status.set(entry.code, 'filtered');
+      continue;
+    }
+    status.set(entry.code, 'scored');
     screened.push({ entry, snap });
   }
 
@@ -172,6 +201,7 @@ export function buildDatasetInBrowser(input: BrowserDatasetInput): BrowserDatase
       market: entry.market,
       sector: entry.sector,
       theme: entry.theme ?? entry.sector,
+      favorite: entry.favorite || undefined,
       scores: EMPTY_SCORES,
       ...snap,
       margin: margins.get(entry.code) ?? null,
@@ -208,6 +238,15 @@ export function buildDatasetInBrowser(input: BrowserDatasetInput): BrowserDatase
     asOf: input.asOf,
     marketContext: input.market,
     candidates: drafts,
+    universe: universe.map((u) => ({
+      code: u.code,
+      name: u.name,
+      sector: u.sector,
+      market: u.market,
+      theme: u.theme,
+      favorite: u.favorite,
+      status: status.get(u.code) ?? 'no-prices',
+    })),
   };
 
   const analysis = analyzeDataset(dataset, { ...DEFAULT_ANALYSIS_OPTIONS, pattern, topN: input.topN });

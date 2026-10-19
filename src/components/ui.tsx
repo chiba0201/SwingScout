@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import type { WarningTag } from '../lib/warnings';
 import { formatNumber, formatPct, formatScore, formatSigned } from '../lib/format';
 import { STANCE_LABELS } from '../lib/market';
-import type { DatasetModeInfo } from '../lib/datasetMode';
 import type { MarketStance, QuotePolarity } from '../types/dataset';
 
 const cx = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(' ');
@@ -114,9 +113,16 @@ type Tone = 'accent' | 'caution';
 /** 0〜100 の細いメーター。トラックは同系色の薄い段 */
 export function ScoreBar({ value, tone = 'accent', className }: { value: number; tone?: Tone; className?: string }) {
   const pct = Math.max(0, Math.min(100, value));
+  // 幅の指定（w-12 など）があればそれを使い、横並びで潰れないよう縮ませない。無ければ親の幅いっぱい
+  const sized = /(^|\s)w-/.test(className ?? '');
   return (
     <div
-      className={cx('h-1.5 w-full overflow-hidden rounded-full', tone === 'accent' ? 'bg-accent-track' : 'bg-caution-track', className)}
+      className={cx(
+        'h-1.5 overflow-hidden rounded-full',
+        sized ? 'shrink-0' : 'w-full',
+        tone === 'accent' ? 'bg-accent-track' : 'bg-caution-track',
+        className,
+      )}
       aria-hidden
     >
       <div
@@ -198,36 +204,6 @@ export function StanceBadge({ stance }: { stance: MarketStance }) {
   return (
     <span className={cx('inline-flex items-center rounded-sm border px-2 py-0.5 text-[12px] font-bold', STANCE_CLASS[stance])}>
       スタンス：{STANCE_LABELS[stance]}
-    </span>
-  );
-}
-
-export function SampleBadge() {
-  return (
-    <span className="rounded-sm border border-caution/50 bg-caution-soft px-1.5 py-px text-[10.5px] font-bold tracking-wider text-caution">
-      SAMPLE
-    </span>
-  );
-}
-
-const DATASET_MODE_CLASS: Record<DatasetModeInfo['mode'], string> = {
-  sample: 'border-caution/50 bg-caution-soft text-caution',
-  universe: 'border-accent/45 bg-accent-soft text-accent',
-  watchlist: 'border-caution/45 bg-caution-soft text-caution',
-  local: 'border-rule-strong bg-panel-2 text-ink-2',
-  unknown: 'border-rule-strong bg-panel-2 text-ink-2',
-};
-
-export function DatasetModeBadge({ info }: { info: DatasetModeInfo }) {
-  return (
-    <span
-      className={cx(
-        'rounded-sm border px-1.5 py-px text-[10.5px] font-bold tracking-wider whitespace-nowrap',
-        DATASET_MODE_CLASS[info.mode],
-      )}
-      title={info.description}
-    >
-      {info.shortLabel}
     </span>
   );
 }

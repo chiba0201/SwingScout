@@ -7,6 +7,7 @@ import type { CalendarEvent, DatasetAnalysis } from '../lib/analysis';
 import { formatDateJa, holidayName, isWithinWindow, toTime, weekdayJa } from '../lib/calendar';
 import { EVENT_CATEGORY_LABELS, IMPORTANCE_LABELS } from '../lib/market';
 import type { ISODate, MarketEventCategory } from '../types/dataset';
+import { ProvisionalBadge, ProvisionalNote } from './PlanStatus';
 import { cx } from './ui';
 
 const CATEGORY_SHORT: Record<MarketEventCategory, string> = {
@@ -90,12 +91,14 @@ export function WeekBoard({ analysis: a }: { analysis: DatasetAnalysis }) {
         <h2 id="board-title" className="text-[13px] font-bold">
           今週の作戦ボード
           <span className="ml-2 font-normal text-ink-2">{w.pattern.label}</span>
+          <ProvisionalBadge a={a} />
         </h2>
         <p className="text-[12px] text-muted">
           <span className="num">{formatDateJa(w.entryDate)}</span> 寄り →{' '}
           <span className="num">{formatDateJa(w.exitDate)}</span> 大引け ・ {w.holdingDays.length}営業日
         </p>
       </header>
+      <ProvisionalNote a={a} className="mx-4 mt-3" />
 
       <ol className="grid grid-cols-1 md:grid-cols-[repeat(5,minmax(0,1fr))_minmax(0,0.9fr)]">
         {w.weekDays.map((date) => {

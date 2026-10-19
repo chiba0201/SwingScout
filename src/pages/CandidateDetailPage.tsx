@@ -1,12 +1,17 @@
 import type { ReactNode } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useParams } from 'react-router';
 import { PriceLadder, Sparkline } from '../components/charts';
+import { EntryPlanCases } from '../components/EntryPlanCases';
+import { FavoriteButton } from '../components/FavoriteToggle';
+import { ProvisionalBadge, ProvisionalNote } from '../components/PlanStatus';
 import { Change, cx, KeyValueGrid, Panel, ScoreBar, Value, WarningTagView } from '../components/ui';
+import { YahooFinanceLink } from '../components/YahooFinanceLink';
 import type { AnalyzedCandidate } from '../lib/analysis';
 import { formatDateJa } from '../lib/calendar';
 import { formatLevel, formatOku, formatPct, formatPrice, formatScore, formatShares, formatSigned, pctFrom } from '../lib/format';
 import { CATEGORY_LABELS } from '../lib/scoring';
-import { useAnalysis } from '../state/DataContext';
+import { universeCodes } from '../lib/workflow';
+import { useAnalysis, useData } from '../state/DataContext';
 import type { ScoreCategory } from '../types/dataset';
 
 const TIMING_LABEL = { 'pre-market': '寄り前', intraday: '場中', 'after-close': '引け後', unknown: '時刻未定' } as const;
@@ -63,7 +68,7 @@ function ScoreBreakdown({ c }: { c: AnalyzedCandidate }) {
         ))}
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
@@ -102,9 +107,25 @@ function ScoreBreakdown({ c }: { c: AnalyzedCandidate }) {
   );
 }
 
+const BACK_LABEL: Record<string, string> = {
+  favorites: '← お気に入り',
+  all: '← 全銘柄',
+};
+
+/** 開いた一覧（候補一覧のタブ）へ戻るリンク先。直接開いたときは候補一覧 */
+function useBackLink(): { to: string; label: string } {
+  const from = (useLocation().state as { from?: string } | null)?.from;
+  if (!from?.startsWith('/candidates')) return { to: '/candidates', label: '← 候補一覧' };
+  const tab = new URLSearchParams(from.split('?')[1] ?? '').get('tab') ?? '';
+  return { to: from, label: BACK_LABEL[tab] ?? '← 候補一覧' };
+}
+
 export function CandidateDetailPage() {
   const a = useAnalysis();
+  const { universeCsv } = useData();
   const { code } = useParams();
+  const back = useBackLink();
+  const location = useLocation();
   const idx = a.ranked.findIndex((c) => c.code === code);
   const c = a.ranked[idx];
 
@@ -112,8 +133,11 @@ export function CandidateDetailPage() {
     return (
       <div className="panel mx-auto mt-6 max-w-lg px-5 py-4">
         <p className="font-bold">銘柄 {code} はこのデータセットにありません</p>
-        <Link to="/candidates" className="mt-2 inline-block text-[13px] font-semibold text-accent hover:underline">
-          候補一覧へ戻る
+        <p className="mt-1 text-[13px] text-ink-2">
+          日足が無い・売買代金や株価の条件外などで採点していない銘柄です。お気に入りにすると、次に候補を生成したときから条件に関係なく採点されます。
+        </p>
+        <Link to={back.to} className="mt-2 inline-block text-[13px] font-semibold text-accent hover:underline">
+          {back.label.replace('← ', '')}へ戻る
         </Link>
       </div>
     );
@@ -124,21 +148,23 @@ export function CandidateDetailPage() {
   const m = c.metrics;
   const close = c.price.close;
   const inTop = c.rank <= a.top.length;
+  // お気に入りは銘柄リストの favorite 列なので、リストにある銘柄だけ付け外しできる
+  const inUniverse = universeCodes(universeCsv).includes(c.code);
 
   return (
     <div className="space-y-4">
       <nav className="flex items-center justify-between gap-3 text-[12px]" aria-label="銘柄の移動">
-        <Link to="/candidates" className="font-semibold text-accent hover:underline">
-          ← 候補一覧
+        <Link to={back.to} className="font-semibold text-accent hover:underline">
+          {back.label}
         </Link>
         <div className="flex gap-3">
           {prev && (
-            <Link to={`/candidates/${prev.code}`} className="text-ink-2 hover:text-accent">
+            <Link to={`/candidates/${prev.code}`} state={location.state} className="text-ink-2 hover:text-accent">
               ‹ {prev.rank}位 {prev.name}
             </Link>
           )}
           {next && (
-            <Link to={`/candidates/${next.code}`} className="text-ink-2 hover:text-accent">
+            <Link to={`/candidates/${next.code}`} state={location.state} className="text-ink-2 hover:text-accent">
               {next.rank}位 {next.name} ›
             </Link>
           )}
@@ -163,10 +189,14 @@ export function CandidateDetailPage() {
               <span>テーマ：{c.theme}</span>
               {c.technical.pattern && <span className="text-ink-2">形：{c.technical.pattern}</span>}
             </div>
-            <h1 className="mt-1 text-[22px] leading-tight font-bold tracking-tight">
-              <span className="num mr-2 text-[17px] font-medium text-ink-2">{c.code}</span>
-              {c.name}
-            </h1>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <h1 className="text-[22px] leading-tight font-bold tracking-tight">
+                <span className="num mr-2 text-[17px] font-medium text-ink-2">{c.code}</span>
+                {c.name}
+              </h1>
+              {inUniverse && <FavoriteButton code={c.code} name={c.name} />}
+              <YahooFinanceLink code={c.code} isSample={a.dataset.meta.isSample} />
+            </div>
             {c.warnings.length > 0 && (
               <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5">
                 {c.warnings.map((w) => (
@@ -211,7 +241,12 @@ export function CandidateDetailPage() {
         </Panel>
 
         <Panel
-          title="作戦"
+          title={
+            <>
+              作戦
+              <ProvisionalBadge a={a} />
+            </>
+          }
           aside={
             <span>
               {a.window.pattern.label}（<span className="num">{formatDateJa(a.window.entryDate)}</span>〜
@@ -219,48 +254,46 @@ export function CandidateDetailPage() {
             </span>
           }
         >
-          <PriceLadder
-            close={close}
-            stop={c.stopLoss.price}
-            zoneLow={c.entryPlan.zoneLow}
-            zoneHigh={c.entryPlan.zoneHigh}
-            targets={c.takeProfit.targets}
-          />
-          <dl className="mt-2">
-            <PlanRow label="入り方">
-              {c.entryPlan.method}
-              {c.entryPlan.gapUpRule && (
-                <span className="mt-1 block text-[12.5px] text-ink-2">
-                  <span className="font-semibold">GU時：</span>
-                  {c.entryPlan.gapUpRule}
-                </span>
-              )}
-            </PlanRow>
-            <PlanRow label="損切り目安" tone="down">
-              <span className="num mr-1.5 font-semibold">{formatPrice(c.stopLoss.price)}円</span>
-              <span className="num text-down">（{formatPct(pctFrom(c.stopLoss.price, close))}）</span>
-              <span className="mt-0.5 block text-ink-2">{c.stopLoss.rule}</span>
-            </PlanRow>
-            <PlanRow label="利確目安" tone="up">
-              <ul className="space-y-0.5">
-                {c.takeProfit.targets.map((t) => (
-                  <li key={t.label}>
-                    <span className="num mr-1.5 font-semibold">{formatPrice(t.price)}円</span>
-                    <span className="num text-up">（{formatPct(pctFrom(t.price, close))}）</span>
-                    <span className="ml-1.5 text-ink-2">{t.label}</span>
-                  </li>
-                ))}
-              </ul>
-              <span className="mt-0.5 block text-ink-2">{c.takeProfit.rule}</span>
-            </PlanRow>
-            <PlanRow label="見送り条件">
-              <ul className="list-disc space-y-0.5 pl-4">
-                {c.risks.skipConditions.map((s) => (
-                  <li key={s}>{s}</li>
-                ))}
-              </ul>
-            </PlanRow>
-          </dl>
+          <ProvisionalNote a={a} className="mb-3" />
+          {/* 暫定のときは価格を少し薄くして、目安であることを見せる */}
+          <div className={cx(a.plan.provisional && 'opacity-70')}>
+            <PriceLadder
+              close={close}
+              stop={c.stopLoss.price}
+              zoneLow={c.entryPlan.zoneLow}
+              zoneHigh={c.entryPlan.zoneHigh}
+              targets={c.takeProfit.targets}
+            />
+            <dl className="mt-2">
+              <PlanRow label="入り方">
+                <EntryPlanCases plan={c.entryPlan} />
+              </PlanRow>
+              <PlanRow label="損切り目安" tone="down">
+                <span className="num mr-1.5 font-semibold">{formatPrice(c.stopLoss.price)}円</span>
+                <span className="num text-down">（{formatPct(pctFrom(c.stopLoss.price, close))}）</span>
+                <span className="mt-0.5 block text-ink-2">{c.stopLoss.rule}</span>
+              </PlanRow>
+              <PlanRow label="利確目安" tone="up">
+                <ul className="space-y-0.5">
+                  {c.takeProfit.targets.map((t) => (
+                    <li key={t.label}>
+                      <span className="num mr-1.5 font-semibold">{formatPrice(t.price)}円</span>
+                      <span className="num text-up">（{formatPct(pctFrom(t.price, close))}）</span>
+                      <span className="ml-1.5 text-ink-2">{t.label}</span>
+                    </li>
+                  ))}
+                </ul>
+                <span className="mt-0.5 block text-ink-2">{c.takeProfit.rule}</span>
+              </PlanRow>
+              <PlanRow label="見送り条件">
+                <ul className="list-disc space-y-0.5 pl-4">
+                  {c.risks.skipConditions.map((s) => (
+                    <li key={s}>{s}</li>
+                  ))}
+                </ul>
+              </PlanRow>
+            </dl>
+          </div>
         </Panel>
       </div>
 
